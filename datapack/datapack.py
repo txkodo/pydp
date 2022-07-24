@@ -1,0 +1,2209 @@
+from __future__ import annotations
+from abc import ABCMeta, abstractmethod
+from enum import Enum, auto
+import json
+import os
+from pathlib import Path
+from random import randint
+import re
+import shutil
+from typing import Any, Callable, Generic, Literal, Protocol, TypeAlias, TypeGuard, TypeVar, get_args, overload, Union, runtime_checkable
+from typing_extensions import Self
+import subprocess
+
+
+def _float_to_str(f:float):
+    float_string = repr(f)
+    if 'e' in float_string:  # detect scientific notation
+        digits, exp = float_string.split('e')
+        digits = digits.replace('.', '').replace('-', '')
+        exp = int(exp)
+        zero_padding = '0' * (abs(int(exp)) - 1)  # minus 1 for decimal point in the sci notation
+        sign = '-' if f < 0 else ''
+        if exp > 0:
+            float_string = '{}{}{}.0'.format(sign, digits, zero_padding)
+        else:
+            float_string = '{}0.{}{}'.format(sign, zero_padding, digits)
+    return float_string
+
+_id_upper  = tuple(map(chr,range(ord('A'),ord('Z')+1)))
+_id_lower  = tuple(map(chr,range(ord('a'),ord('z')+1)))
+_id_number = tuple(map(chr,range(ord('0'),ord('9')+1)))
+
+def _gen_id(length:int=8,prefix:str='',suffix:str='',upper:bool=True,lower:bool=True,number:bool=True):
+  """{length=8}桁のIDを生成する [0-9a-zA-Z]"""
+  chars:list[str] = []
+  if upper :chars.extend(_id_upper)
+  if lower :chars.extend(_id_lower)
+  if number:chars.extend(_id_number)
+  maxidx = len(chars) - 1
+  return prefix + ''.join(chars[randint(0,maxidx)] for _ in range(length)) + suffix
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class SubCommand:
+  """ at / positioned / in / as / rotated / store ..."""
+  def __init__(self,content:str|None=None) -> None:
+    self.subcommands:list[str] = []
+    if content is not None:
+      self.subcommands.append( content )
+
+  @overload
+  def __add__(self,other:ConditionSubCommand) -> ConditionSubCommand:pass
+  
+  @overload
+  def __add__(self,other:SubCommand) -> SubCommand:pass
+
+  @overload
+  def __add__(self,other:Command) -> Command:pass
+  
+  def __add__(self,other:SubCommand|Command):
+    if isinstance(other,ConditionSubCommand):
+      result = ConditionSubCommand()
+      result.subcommands.extend(self.subcommands)
+      result.subcommands.extend(other.subcommands)
+      return result
+    elif isinstance(other,SubCommand):
+      result = SubCommand()
+      result.subcommands.extend(self.subcommands)
+      result.subcommands.extend(other.subcommands)
+      return result
+    elif isinstance(other,_FunctionCommand):
+      result = _FunctionCommand(other.holder)
+      result.subcommands.extend(self.subcommands)
+      result.subcommands.extend(other.subcommands)
+      return result
+    else:
+      result = Command(other.content)
+      result.subcommands.extend(self.subcommands)
+      result.subcommands.extend(other.subcommands)
+      return result
+
+  def __iadd__(self,other:SubCommand):
+    self.subcommands.extend(other.subcommands)
+    return self
+
+  def As(self,entity:IEntitySelector):
+    """ execute as @ """
+    return self + MC.As(entity)
+
+  def At(self,entity:IEntitySelector):
+    """ execute at @ """
+    return self + MC.At(entity)
+
+  def Positioned(self,pos:IPosition):
+    """ execute positioned ~ ~ ~ """
+    return self + MC.Positioned(pos)
+
+  def PositionedAs(self,entity:IEntitySelector):
+    """ execute positioned as @ """
+    return self + MC.PositionedAs(entity)
+
+  def Align(self,axes:Literal['x','y','z','xy','yz','xz','xyz']):
+    """ execute align xyz """
+    return self + MC.Align(axes)
+    
+  def Facing(self,pos:IPosition):
+    """ execute facing ~ ~ ~ """
+    return self + MC.Facing(pos)
+
+  def FacingEntity(self,entity:IEntitySelector):
+    """ execute facing entity @ """
+    return self + MC.FacingEntity(entity)
+
+  def Rotated(self,yaw:float,pitch:float):
+    """ execute rotated ~ ~ """
+    return self + MC.Rotated(yaw,pitch)
+
+  def RotatedAs(self,target:IEntitySelector):
+    """ execute rotated as @ """
+    return self + MC.RotatedAs(target)
+
+  def In(self,dimension:str):
+    """ execute in {dimension} """
+    return self + MC.In(dimension)
+
+  def Anchored(self,anchor:Literal['feet','eyes']):
+    """ execute anchored feet|eyes """
+    return self + MC.Anchored(anchor)
+
+  def IfBlock(self,pos:IPosition,block:Block):
+    """ execute if block ~ ~ ~ {block} """
+    return self + MC.IfBlock(pos,block)
+
+  def UnlessBlock(self,pos:IPosition,block:str):
+    """ execute unless block ~ ~ ~ {block} """
+    return self + MC.UnlessBlock(pos,block)
+
+  def IfBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+    """ execute if blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
+    return self + MC.IfBlocks(begin,end,destination,method)
+
+  def UnlessBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+    """ execute unless blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
+    return self + MC.UnlessBlocks(begin,end,destination,method)
+
+  def IfEntity(self,entity:IEntitySelector):
+    """ execute if entity {entity} """
+    return self + MC.IfEntity(entity)
+
+  def UnlessEntity(self,entity:IEntitySelector):
+    """ execute unless entity {entity} """
+    return self + MC.UnlessEntity(entity)
+
+  def IfScore(self,target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
+    """ execute if score {entity} {operator} {source} """
+    return self + MC.IfScore(target,source,operator)
+
+  def IfScoreMatch(self,target:Scoreboard,start:int,stop:int|None=None):
+    """ execute if score {entity} matches {start}..{stop} """
+    return self + MC.IfScoreMatch(target,start,stop)
+
+  def UnlessScore(self,target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
+    """ execute unless score {entity} {operator} {source} """
+    return self + MC.UnlessScore(target,source,operator)  
+
+  def UnlessScoreMatch(self,target:Scoreboard,start:int,stop:int|None=None):
+    """ execute unless score {entity} matches {start}..{stop} """
+    return self + MC.UnlessScoreMatch(target,start,stop)
+
+  def StoreResultNbt(self,nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
+    """ execute store result {nbt} {scale} """
+    return self + MC.StoreResultNbt(nbt,scale)
+
+  def StoreSuccessNbt(self,nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
+    """ execute store success {nbt} {scale} """
+    return self + MC.StoreSuccessNbt(nbt,scale)
+
+  def StoreResultScore(self,score:Scoreboard):
+    """ execute store result score {score} """
+    return self + MC.StoreResultScore(score)
+
+  def StoreSuccessScore(self,score:Scoreboard):
+    """ execute store success score {score} """
+    return self + MC.StoreSuccessScore(score)
+
+  def StoreResultBossbar(self,id:str,case:Literal['value','max']):
+    """ execute store result bossbar {id} value|max {score} """
+    return self + MC.StoreResultBossbar(id,case)
+
+  def StoreSuccessBossbar(self,id:str,case:Literal['value','max']):
+    """ execute store success bossbar {id} value|max {score} """
+    return self + MC.StoreSuccessBossbar(id,case)
+
+  def Run(self,command:str):
+    """ execute run {command} """
+    return self + MC.Run(command)
+
+
+class Command:
+  """ any minecraft command """
+  def __init__(self,content:str) -> None:
+    self.subcommands:list[str] = []
+    self.content = content
+
+  def export(self) -> str:
+    result = self.content
+    if self.subcommands:
+      return "execute " + " ".join(self.subcommands) + " run " + result
+    else:
+      return result
+
+class ConditionSubCommand(SubCommand,Command):
+  """ if / unless """
+  def export(self) -> str:
+    assert self.subcommands
+    return "execute " + " ".join(self.subcommands)
+
+class _FunctionCommand(Command):
+  """ function minecraft command """
+  def __init__(self,holder:Function) -> None:
+    super().__init__('')
+    self.holder = holder
+
+  def export(self) -> str:
+    raise NotImplementedError
+
+class _ScheduleCommand(Command):
+  """ function minecraft command """
+  def __init__(self,holder:Function,tick:int,append:bool) -> None:
+    super().__init__('')
+    self.holder = holder
+    self.tick = tick
+    self.append = append
+
+  def export(self) -> str:
+    return f'schedule function {self.holder.expression} {self.tick}t {"append" if self.append else "replace"}'
+
+class _ScheduleClearCommand(Command):
+  """ function minecraft command """
+  def __init__(self,holder:Function) -> None:
+    super().__init__('')
+    self.holder = holder
+
+  def export(self) -> str:
+    return f'schedule clear {self.holder.expression}'
+
+class FunctionTag:
+  functiontags:list[FunctionTag] = []
+  def __init__(self,namespace:str,name:str) -> None:
+    FunctionTag.functiontags.append(self)
+    self.namespace = namespace
+    self.name = name
+    self.functions:list[Function] = []
+
+  def append(self,function:Function):
+    function.tagged = True
+    self.functions.append(function)
+  
+  def check_call_relation(self):
+    """呼び出し先のファンクションにタグから呼ばれることを伝える"""
+    for f in self.functions:
+      f.tagged = True
+
+  def export(self,path:Path) -> None:
+    path = path/f"data/{self.namespace}/tags/functions/{self.name}.json"
+    values:list[str] = []
+    for f in self.functions:
+      if f.callstate is _FuncState.EXPORT:
+        """中身のある呼び出し先だけ呼び出す"""
+        values.append(f.expression)
+
+    paths:list[Path] = []
+    _path = path
+    while not _path.exists():
+      paths.append(_path)
+      _path = _path.parent
+    Datapack.created_paths.extend(reversed(paths))
+
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps({"values":values}),encoding='utf8')
+
+
+class IDatapackLibrary:
+  """
+  データパックライブラリ用クラス
+
+  このクラスを継承すると出力先データパックに自動で導入される
+  """
+  using = True
+
+  @classmethod
+  def install(cls,datapack_path:Path) -> None:
+    """
+    ライブラリを導入
+
+    データパック出力時に cls.using == True なら呼ばれる
+
+    導入済みでも呼ばれる
+
+    datapack_path : saves/{worldname}/datapacks/{datapack}
+    """
+    raise NotImplementedError
+  
+  @staticmethod
+  def rmtree(path:Path):
+    """ アクセス拒否を解消したshutil.rmtree """
+    def onerror(func:Callable[[Path],None], path:Path, exc_info:Any):
+      """
+      Error handler for ``shutil.rmtree``.
+
+      If the error is due to an access error (read only file)
+      it attempts to add write permission and then retries.
+
+      If the error is for another reason it re-raises the error.
+
+      Usage : ``shutil.rmtree(path, onerror=onerror)``
+      """
+      import stat
+      if not os.access(path, os.W_OK):
+          # Is the error an access error ?
+          os.chmod(path, stat.S_IWUSR)
+          func(path)
+      else:
+          raise
+    shutil.rmtree(path,onerror=onerror)
+  
+  @classmethod
+  def uninstall(cls,datapack_path:Path) -> None:
+    """
+    ライブラリを削除
+
+    未導入でも呼ばれる
+
+    datapack_path : saves/{worldname}/datapacks/{datapack}
+    """
+    raise NotImplementedError
+
+class Datapack:
+  default_namespace:str
+  default_folder:str
+  created_paths:list[Path] = []
+
+  @staticmethod
+  def export(path:Path,default_namespace:str='_',default_folder:str=''):
+    """
+    データパックを指定パスに出力する
+
+    必ず一番最後に呼ぶこと
+
+    params
+    ---
+    path: Path
+      データパックのパス ...\\saves\\\\{world_name}\\datapacks\\\\{datapack_name}
+
+    default_namespace: str = '_'
+      自動生成されるファンクションの格納先の名前空間
+
+      例 : '_', 'foo'
+
+    default_folder: str = ''
+      自動生成されるファンクションの格納先のディレクトリ階層 空文字列の場合は名前空間直下に生成
+
+      例 : '', 'foo/', 'foo/bar/'
+    """
+    if not re.fullmatch('[0-9a-z_-]+',default_namespace):
+      raise ValueError(f'default_namespace argument must match /[0-9a-z_-]+/ not "{default_namespace}"')
+
+    if not re.fullmatch(r'([0-9a-z_\.-]+/)*',default_folder):
+      raise ValueError(fr'default_folder argument must match /([0-9a-z_\.-]+/)*/ not "{default_folder}"')
+
+    Datapack.default_namespace = default_namespace
+    Datapack.default_folder = default_folder
+
+    for library in IDatapackLibrary.__subclasses__():
+      if library.using:
+        library.install(path)
+      else:
+        library.uninstall(path)
+
+    mccoretxt = (path/"mccore.txt")
+    if mccoretxt.exists():
+      for s in reversed(mccoretxt.read_text().split('\n')):
+        p = (path / s)
+        if not p.exists():
+          continue
+
+        if p.is_file():
+          p.unlink()
+        elif p.is_dir() and not any(p.iterdir()):
+          p.rmdir()
+
+    if not path.exists():
+      Datapack.created_paths.append(path)
+      path.mkdir(parents=True)
+
+    mcmeta = path/"pack.mcmeta"
+    if not mcmeta.exists():
+      mcmeta.write_text("""{
+  "pack":{
+    "pack_format":9,
+    "description":"mccore auto generated pack"
+  }
+}""")
+
+    for f in FunctionTag.functiontags:
+      # 呼び出し構造の解決
+      f.check_call_relation()
+
+    for f in Function.functions:
+      # 呼び出し構造の解決
+      f.check_call_relation()
+
+    for f in Function.functions:
+      # 書き出しか埋め込みかを決定する
+      f.define_state()
+
+    for f in Function.functions:
+      # 埋め込みが再帰しないように解決
+      f.recursivecheck()
+
+    for f in FunctionTag.functiontags:
+      # ファンクションタグ出力
+      f.export(path)
+
+    for f in Function.functions:
+      # ファンクション出力
+      f.export(path)
+
+    pathstrs:list[str] = []
+    for p in Datapack.created_paths:
+      relpath = p.relative_to(path)
+      pathstrs.append(str(relpath))
+    mccoretxt.write_text('\n'.join(pathstrs))
+
+
+class _FuncState(Enum):
+  NEEDLESS = auto()
+  FLATTEN = auto()
+  SINGLE = auto()
+  EXPORT = auto()
+
+class Function:
+  functions:list[Function] = []
+
+
+
+  @classmethod
+  def nextPath(cls) -> str:
+    """無名ファンクションのパスを生成する"""
+    return _gen_id(upper=False,length=24)
+
+  callstate:_FuncState
+
+  def __init__(self,namespace:str|None=None,name:str|None=None,commands:None|list[Command]=None) -> None:
+    """
+    mcfunctionをあらわすクラス
+
+    `Function += Command`でコマンドを追加できる。
+
+    マイクラ上では`function {namespace}:{name}`となる。
+
+    `namespace`,`name`を省略するとデフォルトの名前空間のデフォルトのフォルダ内に`"{自動生成id}.mcfunction"`が生成される。
+    ただし、最適化によってmcfunctionファイルが生成されない場合がある。
+
+    デフォルトの名前空間とデフォルトのフォルダはFunction.exportAll()の引数で設定可能。
+
+    params
+    ---
+    namespace: Optional[str] = None
+      ファンクション名前空間
+
+      省略するとデフォルトの名前空間となる (Function.exportAll()の引数で設定可能) 
+
+      例: `"minecraft"` `"mynamespace"`
+
+    name: Optional[str] = None
+      ファンクションのパス 空白や'/'で終わる場合はファンクション名が`".mcfunction"`となる
+
+      省略するとデフォルトのフォルダ内の`{自動生成id}.mcfunction`となる (Function.exportAll()の引数で設定可能) 
+
+      例: `""` `"myfync"` `"dir/myfunc"` `"dir/subdir/"`
+
+    commands: list[Command] = []
+      コマンドのリスト
+
+      += で後からコマンドを追加できるので基本的には与えなくてよい
+
+    example
+    ---
+
+    ```python
+    func1 = Function('minecraft','test/func')
+    func1 += MC.Say('hello')
+
+    func2 = Function()
+
+    func1 += func2.call()
+    ```
+
+    """
+    
+    if namespace is not None and not re.fullmatch('[0-9a-z_-]+',namespace):
+      raise ValueError(f'namespace argument must match "a" "a0" "a_b-" not "{namespace}"')
+    
+    if name is not None and not re.fullmatch(r'([0-9a-z_\.-]+/)*([0-9a-z_\.-]+)?',name):
+      raise ValueError(f'name argument must like "" "a" "a1/b.1" "a_/b-/" not "{name}"')
+
+    self.functions.append(self)
+    self.commands:list[Command] = [*commands] if commands else []
+    self._namespace = namespace
+    self._name = name
+    self._children:set[Function] = set()
+
+    self._hasname = name is not None
+    self._scheduled = False
+    self.tagged = False
+    self.subcommanded = False
+    self.used = False
+    self.visited = False
+    self.calls:set[Function] = set()
+  
+  @property
+  def namespace(self) -> str:
+    if self._namespace is None:
+      self._namespace = Datapack.default_namespace
+    return self._namespace
+
+  @property
+  def name(self) -> str:
+    if self._name is None:
+      self._name = Datapack.default_folder+self.nextPath()
+    return self._name
+  
+  def __iadd__(self,value:str|Command):
+    match value:
+      case str():
+        self.append(Command(value))
+      case Command():
+        self.append(value)
+    return self
+
+  def append(self,*commands:Command):
+    for command in commands:
+      if isinstance(command,_FunctionCommand):
+        self._children.add(command.holder)
+    self.commands.extend(commands)
+
+  @property
+  def expression(self) -> str:
+    return f"{self.namespace}:{self.name}"
+
+  def call(self) -> Command:
+    return _FunctionCommand(self)
+
+  def schedule(self,tick:int,append:bool=True) -> Command:
+    self._scheduled = True
+    return _ScheduleCommand(self,tick,append)
+
+  def clear_schedule(self) -> Command:
+    self._scheduled = True
+    return _ScheduleClearCommand(self)
+
+  def _isempty(self):
+    return len(self.commands) == 0
+
+  def _issingle(self):
+    return len(self.commands) == 1
+
+  def _ismultiple(self):
+    return len(self.commands) > 1
+
+  def check_call_relation(self):
+    """呼び出し先一覧を整理"""
+    for cmd in self.commands:
+      if isinstance(cmd,_FunctionCommand):
+        if cmd.subcommands:
+          cmd.holder.subcommanded = True
+        cmd.holder.used = True
+        self.calls.add(cmd.holder)
+
+  def define_state(self) -> None:
+    """関数を埋め込むか書き出すか決定する"""
+    if self._hasname:
+      self.callstate = _FuncState.EXPORT
+    elif self._isempty():
+      self.callstate = _FuncState.NEEDLESS
+    elif self._scheduled or self.tagged:
+      self.callstate = _FuncState.EXPORT
+    elif not self.subcommanded:
+      self.callstate = _FuncState.FLATTEN
+    elif self._issingle():
+      self.callstate = _FuncState.SINGLE
+    else:
+      self.callstate = _FuncState.EXPORT
+
+  def recursivecheck(self,parents:set[Function]=set()):
+    """埋め込み再帰が行われている場合、ファイル出力に切り替える"""
+    if self.visited: return
+    parents = parents|{self}
+
+    for cmd in self.commands:
+      if isinstance(cmd,_FunctionCommand):
+        func = cmd.holder
+        if func in parents:
+          func.callstate = _FuncState.EXPORT
+        if func.callstate is _FuncState.FLATTEN or func.callstate is _FuncState.SINGLE:
+          func.recursivecheck(parents)
+
+    self.visited = True
+
+  def export_commands(self,path:Path,commands:list[str],subcommand:list[str]):
+    match self.callstate:
+      case _FuncState.NEEDLESS:
+        pass
+      case _FuncState.FLATTEN:
+        assert not subcommand
+        for cmd in self.commands:
+          if isinstance(cmd,_FunctionCommand):
+            cmd.holder.export_commands(path,commands,cmd.subcommands)
+          else:
+            commands.append(cmd.export())
+      case _FuncState.SINGLE:
+        assert len(self.commands) == 1
+        cmd = self.commands[0]
+        if isinstance(cmd,_FunctionCommand):
+          cmd.holder.export_commands(path,commands,subcommand + cmd.subcommands)
+        else:
+          cmd.subcommands = subcommand + cmd.subcommands
+          commands.append(cmd.export())
+      case _FuncState.EXPORT:
+        cmds:list[str] = []
+        for cmd in self.commands:
+          if isinstance(cmd,_FunctionCommand):
+            cmd.holder.export_commands(path,cmds,cmd.subcommands)
+          else:
+            cmds.append(cmd.export())
+        self.export_function(path,cmds)
+        c = Command(f"function {self.expression}")
+        c.subcommands = [*subcommand]
+        commands.append(c.export())
+
+  def export_function(self,path:Path,commands:list[str]):
+    path = path/f"data/{self.namespace}/functions/{self.name}.mcfunction"
+
+    paths:list[Path] = []
+    _path = path
+    while not _path.exists():
+      paths.append(_path)
+      _path = _path.parent
+    Datapack.created_paths.extend(reversed(paths))
+
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text("\n".join(commands),encoding='utf8')
+
+  def export(self,path:Path) -> None:
+    if self.callstate is _FuncState.EXPORT:
+      self.export_commands(path,[],[])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class MC:
+  """
+  コマンド/サブコマンド生成メソッドをまとめたstaticクラス
+
+  大体のコマンドはここから呼び出せる
+
+  コマンドを追加する場合もここに
+  """
+
+  @staticmethod
+  def As(entity:IEntitySelector):
+    return entity.As()
+
+  @staticmethod
+  def At(entity:IEntitySelector):
+    return entity.At()
+
+  @staticmethod
+  def Positioned(pos:IPosition):
+    return pos.Positioned()
+
+  @staticmethod
+  def PositionedAs(entity:IEntitySelector):
+    return entity.PositionedAs()
+
+  @staticmethod
+  def Align(axes:Literal['x','y','z','xy','yz','xz','xyz']):
+    return SubCommand('align '+axes)
+
+  @staticmethod
+  def Facing(pos:IPosition):
+    return pos.Facing()
+
+  @staticmethod
+  def FacingEntity(entity:IEntitySelector):
+    return entity.FacingEntity()
+
+  @staticmethod
+  def Rotated(yaw:float,pitch:float):
+    return SubCommand(f'rotated {_float_to_str(yaw)} {_float_to_str(pitch)}')
+
+  @staticmethod
+  def RotatedAs(entity:IEntitySelector):
+    return entity.RotatedAs()
+
+  @staticmethod
+  def In(dimension:str):
+    return SubCommand(f'in {dimension}')
+
+  @staticmethod
+  def Anchored(anchor:Literal['feet','eyes']):
+    return SubCommand(f'anchored {anchor}')
+
+  @staticmethod
+  def IfEntity(entity:IEntitySelector):
+    return entity.IfEntity()
+
+  @staticmethod
+  def UnlessEntity(entity:IEntitySelector):
+    return entity.UnlessEntity()
+
+  @staticmethod
+  def IfBlock(pos:IPosition,block:Block):
+    return ConditionSubCommand(f"if block {pos.expression()} {block.expression()}")
+
+  @staticmethod
+  def UnlessBlock(pos:IPosition,block:str):
+    return pos.UnlessBlock(block)
+
+  @staticmethod
+  def IfBlocks(begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+    return SubCommand(f'if blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
+
+  @staticmethod
+  def UnlessBlocks(begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+    return SubCommand(f'unless blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
+
+  @staticmethod
+  def IfScore(target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
+    return SubCommand(f'if score {target.expression()} {operator} {target.expression()}')
+
+  @staticmethod
+  def IfScoreMatch(target:Scoreboard,start:int,stop:int|None=None):
+    if stop is None:
+      return SubCommand(f'if score {target.expression()} matches {start}')
+    else:
+      return SubCommand(f'if score {target.expression()} matches {start}..{stop}')
+
+  @staticmethod
+  def UnlessScore(target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
+    return SubCommand(f'if score {target.expression()} {operator} {source.expression()}')
+
+  @staticmethod
+  def UnlessScoreMatch(target:Scoreboard,start:int,stop:int|None=None):
+    if stop is None:
+      return SubCommand(f'unless score {target.expression()} match {start}')
+    else:
+      return SubCommand(f'unless score {target.expression()} match {start}..{stop}')
+
+  @staticmethod
+  def StoreResultNbt(nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
+    return nbt.storeResult(scale)
+
+  @staticmethod
+  def StoreSuccessNbt(nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
+    return nbt.storeSuccess(scale)
+
+  @staticmethod
+  def StoreResultScore(scoreboard:Scoreboard):
+    return SubCommand(f'store result score {scoreboard.expression()}')
+  
+  @staticmethod
+  def StoreSuccessScore(scoreboard:Scoreboard):
+    return SubCommand(f'store success score {scoreboard.expression()}')
+  
+  @staticmethod
+  def StoreResultBossbar(id:str,case:Literal['value','max']):
+    return SubCommand(f'store result bossbar {id} {case}')
+
+  @staticmethod
+  def StoreSuccessBossbar(id:str,case:Literal['value','max']):
+    return SubCommand(f'store success bossbar {id} {case}')
+  
+  @staticmethod
+  def Run(command:str):
+    return Command(command)
+
+  @staticmethod
+  def Say(content:str):
+    return Command(f'say {content}')
+
+  @staticmethod
+  def Tellraw(entity:IEntitySelector,*value:jsontext):
+    v = "" if len(value) == 0 else evaljsontext(value[0] if len(value) == 1 else list(value))
+    return Command(f'tellraw {entity.expression()} {json.dumps(v)}')
+
+  @staticmethod
+  def Summon(type:str,pos:IPosition,**nbt:Value[INbt]):
+    if nbt:
+      return Command(f'summon {type} {pos.expression()} {Compound(nbt).str()}')
+    return Command(f'summon {type} {pos.expression()}')
+  
+  @staticmethod
+  def Kill(selector:IEntitySelector):
+    return Command(f'kill {selector.expression()}')
+  
+  class Tag:
+    @staticmethod
+    def List(entity:IEntitySelector):
+      return Command(f'tag {entity.expression()} list')
+
+    @staticmethod
+    def Add(entity:IEntitySelector,tag:str):
+      return Command(f'tag {entity.expression()} add {tag}')
+
+    @staticmethod
+    def Remove(entity:IEntitySelector,tag:str):
+      return Command(f'tag {entity.expression()} remove {tag}')
+
+  @staticmethod
+  def CallFunc(function:str):
+    return Command(f'function {function}')
+
+  @staticmethod
+  def SetBlock(block:Block,pos:IPosition,mode:Literal['destroy','keep','replace']|None=None):
+    if mode:
+      return Command(f'setblock {pos.expression()} {block.expression()} {mode}')
+    return Command(f'setblock {pos.expression()} {block.expression()}')
+  
+  @staticmethod
+  def Fill(start:IPosition,end:IPosition,block:Block,mode:Literal['destroy','hollow','keep','outline','replace']|None=None,oldblock:Block|None=None)->Command:
+    if mode == 'replace':
+      if oldblock is None:
+        raise ValueError('fill mode "replace" needs argument "oldblock"')
+      return Command(f'fill {start.expression()} {end.expression()} {block.expression()} replace {oldblock.expression()}')
+    if oldblock is not None:
+      raise ValueError(f'''fill mode "{mode}" doesn't needs argument "oldblock"''')
+    return Command(f'fill {start.expression()} {end.expression()} {block.expression()} {mode}')
+
+  @staticmethod
+  def Clone(
+      start:IPosition,
+      end:IPosition,
+      target:IPosition,
+      maskmode:Literal['replace','masked','filtered']|None=None,
+      clonemode:Literal['normal','force','move']|None=None,
+      filterblock:Block|None=None
+    ):
+    clonemode_suffix = '' if clonemode is None else ' '+clonemode
+    if maskmode == 'filtered':
+      if filterblock is None:
+        raise ValueError('clone mode "replace" needs argument "filterblock"')
+      return Command(f'clone {start.expression()} {end.expression()} {target.expression()} filtered {filterblock.expression()}' + clonemode_suffix)
+
+    if filterblock is not None:
+      raise ValueError(f'''clone mode "{maskmode}" doesn't needs argument "filterblock"''')
+    if maskmode is None:
+      if clonemode is not None:
+        raise ValueError(f'"clonemode" argument needs to be used with "maskmode" argument')
+      return Command(f'clone {start.expression()} {end.expression()} {target.expression()}')
+    return Command(f'clone {start.expression()} {end.expression()} {target.expression()} {maskmode}'+clonemode_suffix)
+
+  @staticmethod
+  def Give(item:Item,count:int):
+    return Command(f'give {item.expression()} {count}')
+
+  @staticmethod
+  def Clear(entity:IEntitySelector,item:Item|None=None,maxcount:int|None=None):
+    cmd = f'clear {entity.expression()}'
+    if item:
+      cmd += f' {item.expression()}'
+      if maxcount:
+        cmd += f' {maxcount}'
+    return Command(cmd)
+  
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int)->Command:pass
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+    cmd = f'particke {id} {pos.expression()} {dx} {dy} {dz} {speed} {count}'
+    if mode:
+      cmd += ' '+mode
+    if entity:
+      cmd += ' '+entity.expression()
+    return Command(cmd)
+  
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str)->Command:pass
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+    """
+    colorcode:
+      "#000000"
+    """
+    return MC.Particle(id,pos,int(colorcode[1:3])/100,int(colorcode[3:5])/100,int(colorcode[5:7])/100,1,0,mode,entity) #type:ignore
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class NbtPath:
+  class INbtPath:
+    def __init__(self,parent:NbtPath.INbtPath) -> None:
+      self._parent = parent
+
+    @abstractmethod
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      """
+      パスが指定された値を持つかどうかを調べるためのパス
+      """
+
+    @abstractmethod
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      """
+      パスをdictの内容で絞るためのパス
+      """
+    
+    @abstractmethod
+    def str(self)->str:pass
+
+    def get(self,scale:float|None=None):
+      if scale is None:
+        return Command(f'data get {self.str()}')
+      return Command(f'data get {self.str()} {_float_to_str(scale)}')
+
+    def store(self,mode:Literal['result','success'],type:Literal['byte','short','int','long','float','double'],scale:float=1):
+      return SubCommand(f'store {mode} {self.str()} {type} {_float_to_str(scale or 1.0)}')
+
+  class Root(INbtPath):
+    """stoarge a:b {}"""
+    def __init__(self,type:Literal["storage","entity","block"],holder:str) -> None:
+      self._type:Literal["storage","entity","block"] = type
+      self._holder = holder
+
+    def match(self,value:Value[INbt]) -> NbtPath.INbtPath:
+      assert Value.isCompound(value)
+      return self.filter(value)
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      return NbtPath.RootMatch(self._type,self._holder,value)
+
+    def holer(self)->str:
+      return f'{self._type} {self._holder}'
+
+    def str(self)->str:
+      return f'{self._type} {self._holder} {{}}'
+
+  class RootMatch(INbtPath):
+    """stoarge a:b {bar:buz}"""
+    def __init__(self,type:Literal["storage","entity","block"],holder:str,match:Value[Compound]) -> None:
+      self._condition = match
+      self._type:Literal["storage","entity","block"] = type
+      self._holder = holder
+
+    def match(self,value:Value[INbt]) -> NbtPath.INbtPath:
+      assert Value.isCompound(value)
+      return self.filter(value)
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      return NbtPath.RootMatch(self._type,self._holder,Compound.mergeValue(self._condition,value))
+
+    def str(self)->str:
+      return self._condition.str()
+
+  class Child(INbtPath):
+    """stoarge a:b foo.bar"""
+    def __init__(self, parent: NbtPath.INbtPath,child:str) -> None:
+      super().__init__(parent)
+      self._value = child
+
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      return self._parent.filter(Compound({self._value:value}))
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      return NbtPath.ChildMatch(self._parent,self._value,value)
+
+    def str(self)->str:
+      if isinstance(self._parent,NbtPath.Root):
+        return f'{self._parent.holer()} {self._value}'
+      return self._parent.str() + '.' + self._value
+
+  class ChildMatch(INbtPath):
+    """stoarge a:b foo.bar{buz:qux}"""
+    def __init__(self, parent: NbtPath.INbtPath,child:str,match:Value[Compound]) -> None:
+      super().__init__(parent)
+      self._value = child
+      self._condition = match
+
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      assert Value.isCompound(value)
+      return self._parent.filter(Compound({self._value:Compound.mergeValue(self._condition,value)}))
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      return NbtPath.ChildMatch(self._parent,self._value,value)
+
+    def str(self)->str:
+      if isinstance(self._parent,NbtPath.Root):
+        return f'{self._parent.holer()} {self._value}{self._condition.str()}'
+      return self._parent.str() + '.' + self._value + self._condition.str()
+
+  class Index(INbtPath):
+    """stoarge a:b foo.bar[0]"""
+    def __init__(self, parent: NbtPath.INbtPath,index:int) -> None:
+      super().__init__(parent)
+      self._index = index
+
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      raise TypeError('indexed nbt value cannot be filtered')
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      raise TypeError('indexed nbt value cannot be filtered')
+
+    def str(self)->str:
+      return f'{self._parent.str()}[{self._index}]'
+
+  class All(INbtPath):
+    """stoarge a:b  foo.bar[]"""
+    def __init__(self, parent: NbtPath.INbtPath) -> None:
+      super().__init__(parent)
+
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      if Value.isCompound(value):
+        return NbtPath.AllMatch(self._parent,value)
+      else:
+        raise TypeError('nbt AllIndexPath cannot be match non-compound value')
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      raise TypeError('indexed nbt value cannot be filtered')
+
+    def str(self)->str:
+      return f'{self._parent.str()}[]'
+
+  class AllMatch(INbtPath):
+    """stoarge a:b foo.bar[{buz:qux}]"""
+    def __init__(self, parent: NbtPath.INbtPath,match:Value[Compound]) -> None:
+      super().__init__(parent)
+      self._condition = match
+
+    def match(self,value:Value[NBT]) -> NbtPath.INbtPath:
+      assert Value.isCompound(value)
+      return NbtPath.AllMatch(self._parent,Compound.mergeValue(self._condition,value))
+
+    def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
+      raise TypeError('indexed nbt value cannot be filtered')
+
+    def str(self)->str:
+      return f'{self._parent.str()}[{self._condition.str()}]'
+
+T = TypeVar('T')
+
+class INbt:
+
+  class Value:
+    pass
+
+  _cls:type[Self]
+  _path:NbtPath.INbtPath
+  
+  def __init_subclass__(cls) -> None:
+    super().__init_subclass__()
+    cls._cls = cls
+
+  def __new__(cls:type[NBT],value:NbtPath.INbtPath,type:type[NBT]) -> NBT:
+    result = super().__new__(cls)
+    result._cls = type
+    result._path = value
+    return result
+
+  @property
+  def path(self):
+    return self._path.str()
+
+  def _get(self,scale:float|None=None) -> Command:
+    if scale is None:
+      return Command(f"data get {self.path}")
+    return Command(f"data get {self.path} {_float_to_str(scale)}")
+
+  def remove(self) -> Command:
+    return Command(f"data remove {self.path}")
+
+  def _storeResult(self,type: Literal['byte', 'short', 'int', 'long', 'float', 'double'],scale:float) -> SubCommand:
+    return self._path.store('result',type,scale)
+
+  def _storeSuccess(self,type: Literal['byte', 'short', 'int', 'long', 'float', 'double'],scale:float) -> SubCommand:
+    return self._path.store('success',type,scale)
+
+  def isMatch(self,value:Value[NBT]) -> ConditionSubCommand:
+    return ConditionSubCommand(f'if data {self._path.match(value).str()}')
+
+  def notMatch(self,value:Value[NBT]) -> ConditionSubCommand:
+    return ConditionSubCommand(f'unless data {self._path.match(value).str()}')
+
+  def set(self,value:Value[NBT]|Self) -> Command:
+    if isinstance(value,Value):
+      return Command(f"data modify {self.path} set value {value.str()}")
+    else:
+      return Command(f"data modify {self.path} set from {value.path}")
+
+NBT = TypeVar('NBT',bound = INbt)
+CO_NBT = TypeVar('CO_NBT',bound = INbt,covariant=True)
+
+class Value(Generic[CO_NBT]):
+  def __init__(self,type:type[CO_NBT],value:str) -> None:
+    self._type = type
+    self._value = value
+
+  def str(self):
+    return self._value
+  
+  @staticmethod
+  def isCompound(value:Value[INbt]) -> TypeGuard[Value[Compound]]:
+    return value._type is Compound
+
+NUMBER = TypeVar('NUMBER',bound=Union[int,float])
+
+class INbtGeneric(INbt,Generic[T]):
+  @classmethod
+  @abstractmethod
+  def _str(cls:type[INBTG],value:T) -> Value[INBTG]:pass
+
+  @overload
+  def __new__(cls:type[INBTG],value:T) -> Value[INBTG]:pass
+  @overload
+  def __new__(cls:type[INBTG],value:NbtPath.INbtPath,type:type[INBTG]) -> INBTG:pass
+  def __new__(cls:type[INBTG],value:NbtPath.INbtPath|T,type:type[INBTG]|None=None):
+    if isinstance(value,NbtPath.INbtPath):
+      assert type is not None
+      if isinstance(value,NbtPath.Root|NbtPath.RootMatch):
+        raise ValueError(f'nbt root cannot be {cls.__name__}')
+      return super().__new__(cls,value,type)
+    else:
+      return cls._str(value)
+
+
+INBTG = TypeVar('INBTG',bound=INbtGeneric[Any])
+
+class INum(INbtGeneric[NUMBER]):
+  _mode:Literal['byte', 'short', 'int', 'long', 'float', 'double']
+  _prefixmap = {'byte':'b','short':'s','int':'','long':'l','float':'f','double':'d'}
+  _min:int|float
+  _max:int|float
+
+  def storeResult(self,scale:float) -> SubCommand: return super()._storeResult(self._mode,scale)
+  def storeSuccess(self,scale:float) -> SubCommand: return super()._storeSuccess(self._mode,scale)
+  def getValue(self,scale:float|None=None) -> Command:return super()._get(scale)
+
+  @classmethod
+  def _str(cls:type[INBTG],value:NUMBER) -> Value[INBTG]:
+    assert issubclass(cls,INum)
+    if value < cls._min or cls._max < value:
+      raise ValueError(f'{cls._mode} must be in range {cls._min}..{cls._max}')
+    if isinstance(value,float):
+      return Value(cls._cls,f'{_float_to_str(value)}{cls._prefixmap[cls._mode]}')
+    return Value(cls._cls,f'{value}{cls._prefixmap[cls._mode]}')
+
+class Byte(INum[int]):
+  _mode = 'byte'
+  _min = -2**7
+  _max = 2**7-1
+
+class Short(INum[int]):
+  _mode = 'short'
+  _min = -2**15
+  _max = 2**15-1
+
+class Int(INum[int]):
+  _mode = 'int'
+  _min = -2**31
+  _max = 2**31-1
+
+class Long(INum[int]):
+  _mode = 'long'
+  _min = -2**63
+  _max = 2**63-1
+
+class Float(INum[float]):
+  _mode = 'float'
+  _min = -3.402823e+38
+  _max = 3.402823e+38
+
+class Double(INum[float]):
+  _mode = 'double'
+  _min = -1.797693e+308
+  _max = 1.797693e+308
+
+class Str(INbtGeneric[str]):
+  @classmethod
+  def _str(cls: type[INbtGeneric[str]], value: str) -> Value[INbtGeneric[str]]:
+    return Value(Str,f'"{value}"')
+
+  def getLength(self,scale:float|None=None) -> Command:return super()._get(scale)
+
+
+class IArray(INbt,Generic[NBT]):
+  _prefix:str
+  _arg:type[NBT]
+
+  def __getitem__(self,index:int) -> NBT:
+    return self._arg(NbtPath.Index(self._path,index),self._arg)
+
+  def all(self) -> NBT:
+    return self._arg(NbtPath.All(self._path),self._arg)
+
+  def getLength(self,scale:float|None=None) -> Command:return super()._get(scale)
+  _cls_name:str
+
+  @staticmethod
+  @abstractmethod
+  def _get_arg(c:type[IArray[NBT]]) -> type[NBT]:pass
+
+  @overload
+  def __new__(cls:type[ARRAY],value:list[Value[NBT]]) -> Value[ARRAY]:pass
+  @overload
+  def __new__(cls:type[ARRAY],value:NbtPath.INbtPath,type:type[ARRAY]) -> ARRAY:pass
+  def __new__(cls:type[ARRAY],value:NbtPath.INbtPath|list[Value[NBT]],type:type[ARRAY]|None=None):
+    if isinstance(value,NbtPath.INbtPath):
+      assert type is not None
+      if isinstance(value,NbtPath.Root|NbtPath.RootMatch):
+        raise ValueError(f'nbt root cannot be {cls._cls_name}')
+      result = super().__new__(cls,value,type)
+      result._arg = cls._get_arg(type)
+      return result
+    else:
+      return Value[cls](cls,f"[{cls._prefix}{','.join( v.str() for v in value)}]")
+
+ARRAY = TypeVar('ARRAY',bound=IArray[Any])
+
+class List(IArray[NBT]):
+  _prefix=''
+
+  @staticmethod
+  def _get_arg(c:type[IArray[NBT]]) -> type[NBT]:
+    return get_args(c)[0]
+
+  def filterAll(self:List[Compound],compound:Value[Compound]) -> Compound:
+    return self._arg(NbtPath.AllMatch(self._path,compound),self._arg)
+
+class ByteArray(IArray[Byte]):
+  _prefix='B;'
+
+  @staticmethod
+  def _get_arg(c:type[IArray[Byte]]) -> type[Byte]:
+    return Byte
+
+class IntArray(IArray[Int]):
+  _prefix='I;'
+
+  @staticmethod
+  def _get_arg(c:type[IArray[Int]]) -> type[Int]:
+    return Int
+
+class Compound(INbt):
+  @overload
+  def __new__(cls:type[Compound],value:dict[str,Value[INbt]]) -> Value[Compound]:pass
+  @overload
+  def __new__(cls:type[Compound],value:NbtPath.INbtPath,type:type[Compound]) -> Compound:pass
+  def __new__(cls:type[Compound],value:NbtPath.INbtPath|dict[str,Value[INbt]],type:type[Compound]|None=None):
+    if isinstance(value,NbtPath.INbtPath):
+      assert type is not None
+      return super().__new__(cls,value,type)
+    else:
+      result = Value(cls,f"{{{','.join( f'{k}:{v.str()}' for k,v in value.items())}}}")
+      result._compound = value #type:ignore
+      return result
+
+  @overload
+  def __getitem__(self,value:str) -> Compound:pass
+  @overload
+  def __getitem__(self,value:type[NBT]) -> NBT:pass
+  @overload
+  def __getitem__(self,value:tuple[str,type[NBT]]) -> NBT:pass
+  def __getitem__(self,value:str|type[NBT]|tuple[str,type[NBT]]):
+    """子要素 self.child"""
+    match value:
+      case str():
+        return Compound(NbtPath.Child(self._path,value),Compound)
+      case (name,r):
+        return r(NbtPath.Child(self._path,name),r)
+      case _:
+        return value(NbtPath.Child(self._path,_gen_id(prefix='_')),value)
+
+  def childMatch(self,child:str,match:Value[Compound]):
+    """条件付き子要素 self.child{foo:bar}"""
+    return Compound(NbtPath.ChildMatch(self._path,child,match),Compound)
+
+  def getLength(self,scale:float|None=None) -> Command:return super()._get(scale)
+
+  @staticmethod
+  def mergeValue(v1:Value[Compound],v2:Value[Compound]):
+    value1:dict[str,Value[INbt]] = v1._compound #type:ignore
+    value2:dict[str,Value[INbt]] = v2._compound #type:ignore
+    result = {**value1}
+    for k,v in value2.items():
+      if Value.isCompound(v) and k in value1:
+        w = value1[k]
+        if Value.isCompound(w):
+          result[k] = Compound.mergeValue(w,v)
+        else:
+          result[k] = v
+      else:
+        result[k] = v
+    r = Value[Compound](Compound,f"{{{','.join( f'{k}:{v.str()}' for k,v in result.items())}}}")
+    r._compound = result #type:ignore
+    return r
+
+COMPOUNDVALUE = TypeVar('COMPOUNDVALUE',bound=Value[Compound])
+COMPOUND = TypeVar('COMPOUND',bound=Compound)
+
+class StorageNbt:
+  def __new__(cls,name:str) -> Compound:
+    return Compound(NbtPath.Root('storage',name),Compound)
+
+class BlockNbt:
+  def __new__(cls,position:IPosition) -> Compound:
+    return Compound(NbtPath.Root('block',position.expression()),Compound)
+
+class EntityNbt:
+  def __new__(cls,selector:IEntitySelector) -> Compound:
+    return Compound(NbtPath.Root('entity',selector.expression()),Compound)
+
+
+
+
+
+
+
+
+class IPosition(metaclass=ABCMeta):
+  prefix:str
+  x:float
+  y:float
+  z:float
+  def __init__(self,x:float,y:float,z:float) -> None:
+    self.x = x
+    self.y = y
+    self.z = z
+
+  def __str__(self):
+    return self.expression()
+
+  @classmethod
+  def origin(cls):
+    return cls(0,0,0)
+  
+  def tuple(self):
+    return (self.x,self.y,self.z)
+
+  def expression(self):
+    def expr(value:float):
+      v = "" if self.prefix and value == 0 else str(value)
+      return self.prefix + v
+    return f'{expr(self.x)} {expr(self.y)} {expr(self.z)}'
+
+  def Positioned(self):
+    return SubCommand(f"positioned {self.expression()}")
+
+  def IfBlock(self,block:str):
+    return ConditionSubCommand(f"if block {self.expression()} {block}")
+
+  def UnlessBlock(self,block:str):
+    return ConditionSubCommand(f"unless block {self.expression()} {block}")
+  
+  def Facing(self):
+    return SubCommand(f"facing {self.expression()}")
+
+  def Nbt(self):
+    return BlockNbt(self)
+  
+  def __add__(self,diff:tuple[float,float,float]):
+    return self.__class__(self.x+diff[0],self.y+diff[1],self.z+diff[2])
+
+  def __iadd__(self,diff:tuple[float,float,float]):
+    self.x+=diff[0]
+    self.y+=diff[1]
+    self.z+=diff[2]
+    return self
+
+  def __sub__(self,diff:tuple[float,float,float]):
+    return self.__class__(self.x-diff[0],self.y-diff[1],self.z-diff[2])
+
+  def __isub__(self,diff:tuple[float,float,float]):
+    self.x-=diff[0]
+    self.y-=diff[1]
+    self.z-=diff[2]
+    return self
+
+  def __neg__(self):
+    return self.__class__(-self.x,-self.y,-self.z)
+
+class Position:
+  class Local(IPosition):
+    """^x ^y ^z"""
+    prefix = "^"
+
+  class World(IPosition):
+    """x y z"""
+    prefix = ""
+
+  class Relative(IPosition):
+    """~x ~y ~z"""
+    prefix = "~"
+
+
+
+class IEntitySelector:
+  target:str
+  def __init__(
+      self,
+      type:str|list[str]|dict[str,bool]={},
+      name:bool|str|list[str]|dict[str,bool]={},
+      tag:bool|str|list[str]|dict[str,bool]={},
+      team:bool|str|list[str]|dict[str,bool]={},
+      scores:dict[str,str]={},
+      advancements:dict[str,bool|dict[str,bool]]={},
+      predicate:str|list[str]|dict[str,bool]={},
+      gamemode:Literal["survival","creative","adventure","spectator"]|list[Literal["survival","creative","adventure","spectator"]]|dict[Literal["survival","creative","adventure","spectator"],bool]={},
+      nbt:Value[Compound]|str|list[Value[Compound]|str|tuple[Value[Compound]|str,bool]]=[],
+      origin:Position.World|None=None,
+      dxdydz:tuple[float,float,float]|None=None,
+      distance:str|None=None,
+      pitch:str|None=None,
+      yaw:str|None=None,
+      level:str|None=None,
+      limit:int|None=None,
+      sort:Literal['nearest','furthest','random','arbitrary']|None=None,
+      **kwarg:str|list[str]|dict[str,bool],
+    ) -> None:
+    """
+    エンティティセレクタ
+
+    実際に生成するときは以下を用いる
+
+    EntitySelector.A() / EntitySelector.P() / EntitySelector.E() / EntitySelector.S() / EntitySelector.R()
+
+
+    https://minecraft.fandom.com/ja/wiki/%E3%82%BF%E3%83%BC%E3%82%B2%E3%83%83%E3%83%88%E3%82%BB%E3%83%AC%E3%82%AF%E3%82%BF%E3%83%BC
+
+    Parameters
+    ----------
+    type :
+        "minecraft:armorstand" / ["armorstand","!marker"] / {"armorstand":True,"marker":False}
+        否定条件のみ複数使用可
+    name :
+        "foo" / ["foo","!bar"] / {"foo":True,"bar":False,"buz":False}
+        否定条件のみ複数使用可
+    tag :
+        True(1つ以上のタグを持つ) / False(いかなるタグも持たない) / "foo" / ["foo","!bar"] / {"foo":True,"bar":False,"buz":False}
+    team:
+        True(1つ以上のチームに所属) / False(いかなるチームにも属さない) / "foo" / ["foo","!bar"] / {"foo":True,"bar":False,"buz":False}
+        否定条件のみ複数使用可
+    scores:
+        {"foo":"-10","bar":"1..100"}
+    advancements:
+        進捗の達成状況または各達成基準状況で絞り込む
+        {"foo":True,"bar":{"buz":False,"qux":True}}
+    predicate:
+        "foo" / ["foo","!bar"] / {"foo":True,"bar":False,"buz":False}
+    gamemode:
+        "survival" / ["creative","!adventure"] / {"spectator":False,"survival":False}
+    nbt:
+        "{foo:bar}" / ["{foo:bar}","!{buz:qux}"] / {"{foo:bar}":True,"{buz:qux}":False}
+    origin:
+        エンティティの検索位置(ワールド座標)
+    dxdydz:
+        エンティティの検索範囲のオフセット
+        origin:(1,2,3) dxdydz(5,10,15) の場合 (1..6,2..12,3..18)に掠るエンティティを選択する
+    distance:
+        エンティティの検索半径
+        "3" / "10..20"
+    pitch:
+        仰・俯角
+        "90"(真下) / "-90"(真上) / "-10..10"
+    yaw:
+        水平角
+        "-180"(北) / "-90"(東) / "0"(南) / "90"(西) / "180"(北) / "-90..90"
+    level:
+        経験値レベル
+        "10" / "11..20"
+    limit:
+        エンティティ最大数
+    sort:
+        エンティティの選択順
+        'nearest'(近い順) / 'furthest'(遠い順),'random'(ランダム),'arbitrary'(スポーンした順※一番軽い)
+    """
+
+    def format(arg:bool|str|list[str]|dict[str,bool]):
+      match arg:
+        case bool():
+          return {"":arg}
+        case str():
+          if arg.startswith("!"):
+            return {arg[1:]:False}
+          else:
+            return {arg:True}
+        case list():
+          result:dict[str,bool] = {}
+          for a in arg:
+            if a.startswith("!"):
+              result[a[1:]] = False
+            else:
+              result[a] = True
+          return result
+        case dict():
+          return {**arg}
+
+    def formatCompound(arg:Value[Compound]|str|list[str|Value[Compound]|tuple[str|Value[Compound],bool]]):
+      match arg:
+        case str():
+          if arg.startswith("!"):
+            return {arg[1:]:False}
+          else:
+            return {arg:True}
+        case Value():
+          return {arg.str():True}
+        case list():
+          result:dict[str,bool] = {}
+          for a in arg:
+            match a:
+              case str():
+                if a.startswith("!"):
+                  result[a[1:]] = False
+                else:
+                  result[a] = True
+              case Value():
+                  result[a.str()] = True
+              case (c,b):
+                match c:
+                  case str():
+                    result[c] = b
+                  case Value():
+                    result[c.str()] = b
+          return result
+
+    self.kwarg = {k:format(v) for k,v in kwarg.items()}
+
+    self["name"] = format(name)
+    self["type"] = format(type)
+    self["gamemode"] = format(gamemode)
+    self["tag"] = format(tag)
+    self["team"] = format(team)
+
+    self["_scores"] = {}
+    self["_advancements"] = {}
+
+    self["predicate"] = format(predicate)
+
+    self["nbt"] = formatCompound(nbt)
+
+    if origin is not None:
+      self["x"][_float_to_str(origin.x)] = True
+      self["y"][_float_to_str(origin.y)] = True
+      self["z"][_float_to_str(origin.z)] = True
+
+    if dxdydz is not None:
+      self["dx"][_float_to_str(dxdydz[0])] = True
+      self["dy"][_float_to_str(dxdydz[1])] = True
+      self["dz"][_float_to_str(dxdydz[2])] = True
+
+    if distance is not None:self["distance"][distance] = True
+
+    if yaw is not None:self["x_rotation"][yaw] = True
+    if pitch is not None:self["y_rotation"][pitch] = True
+
+    if level is not None:self["level"][level] = True
+
+    if limit is not None:self["limit"][str(limit)] = True
+    if sort is not None:self["sort"][sort] = True
+
+    self.scores = scores
+    self.advancements = advancements
+  
+  def __str__(self) -> str:
+    return self.expression()
+
+  def __getitem__(self,index:str) -> dict[str,bool]:
+    if index not in self.kwarg:
+      self.kwarg[index] = {}
+    return self.kwarg[index]
+
+  def __setitem__(self,index:str,value:dict[str,bool]) -> None:
+    self.kwarg[index] = value
+  
+  def IfEntity(self):
+    return ConditionSubCommand("if entity " + self.expression())
+
+  def UnlessEntity(self):
+    return ConditionSubCommand("unless entity " + self.expression())
+  
+  def As(self):
+    return SubCommand("as " + self.expression())
+  
+  def At(self):
+    return SubCommand("at " + self.expression())
+
+  def PositionedAs(self):
+    return SubCommand("positioned as " + self.expression())
+
+  def FacingEntity(self):
+    return SubCommand("facing entity " + self.expression())
+
+  def RotatedAs(self):
+    return SubCommand("rotated as " + self.expression())
+
+  def expression(self):
+    def bool2str(x:bool):
+      return str(x).lower()
+
+    selectors:list[str] = []
+
+    for k,vs in self.kwarg.items():
+      match k:
+        case "_scores":
+          if self.scores:
+            selectors.append(f'scores={{{",".join(f"{k}={v}" for k,v in self.scores.items())}}}')
+        case "_advancements":
+          if self.advancements:
+            selectors.append(f'advancements={{{",".join( k + "=" +( bool2str(v) if isinstance(v,bool) else "{"+",".join(f"{ki}={bool2str(vi)}" for ki,vi in v.items())+"}") for k,v in self.advancements.items())}}}')
+        case _:
+          selectors.extend([f'{k}={["!",""][b]}{v}' for v,b in vs.items()])
+
+    if selectors:
+      return f'{self.target}[{",".join(selectors)}]'
+    else:
+      return f'{self.target}'
+
+  @property
+  def nbt(self):
+    return EntityNbt(self)
+
+  def score(self,objective:Objective):
+    return Scoreboard(objective,self)
+
+  def PleaseMyDat(self):
+    return self.As() + OhMyDat.Please()
+
+  def TagAdd(self,id:str):
+    return MC.Tag.Add(self,id)
+
+  def TagRemove(self,id:str):
+    return MC.Tag.Remove(self,id)
+
+  def TagList(self):
+    return MC.Tag.List(self)
+  
+  def merge(self:S,other:S):
+    result = self.__class__()
+    result.kwarg = {**self.kwarg,**other.kwarg}
+    result.scores = {**self.scores,**other.scores}
+    result.advancements = {**self.advancements,**other.advancements}
+    return result
+  
+  def filter(
+        self,
+        type:str|list[str]|dict[str,bool]={},
+        name:bool|str|list[str]|dict[str,bool]={},
+        tag:bool|str|list[str]|dict[str,bool]={},
+        team:bool|str|list[str]|dict[str,bool]={},
+        scores:dict[str,str]={},
+        advancements:dict[str,bool|dict[str,bool]]={},
+        predicate:str|list[str]|dict[str,bool]={},
+        gamemode:Literal["survival","creative","adventure","spectator"]|list[Literal["survival","creative","adventure","spectator"]]|dict[Literal["survival","creative","adventure","spectator"],bool]={},
+        nbt:Value[Compound]|str|list[Value[Compound]|str|tuple[Value[Compound]|str,bool]]=[],
+        origin:Position.World|None=None,
+        dxdydz:tuple[float,float,float]|None=None,
+        distance:str|None=None,
+        pitch:str|None=None,
+        yaw:str|None=None,
+        level:str|None=None,
+        limit:int|None=None,
+        sort:Literal['nearest','furthest','random','arbitrary']|None=None,
+        **kwarg:str|list[str]|dict[str,bool]
+      ):
+      other = self.__class__(type,name,tag,team,scores,advancements,predicate,gamemode,nbt,origin,dxdydz,distance,pitch,yaw,level,limit,sort,**kwarg)
+      return self.merge(other)
+  
+  def jsontext(self) -> jsontextvalue:
+    return {"selector":self.expression()}
+
+
+S = TypeVar('S',bound=IEntitySelector)
+
+class EntitySelector:
+  class S(IEntitySelector):
+    """@s[...]"""
+    target = "@s"
+
+  class E(IEntitySelector):
+    """@e[...]"""
+    target = "@e"
+
+  class A(IEntitySelector):
+    """@a[...]"""
+    target = "@a"
+
+  class P(IEntitySelector):
+    """@p[...]"""
+    target = "@p"
+
+  class R(IEntitySelector):
+    """@r[...]"""
+    target = "@r"
+
+  class Player(IEntitySelector):
+    """
+    プレイヤー名を直接使うセレクタ
+    txkodo[gamemode=survival]
+    """
+    def __init__(self, player:str, type: str | list[str] | dict[str, bool] = {}, name: bool | str | list[str] | dict[str, bool] = {}, tag: bool | str | list[str] | dict[str, bool] = {}, team: bool | str | list[str] | dict[str, bool] = {}, scores: dict[str, str] = {}, advancements: dict[str, bool | dict[str, bool]] = {}, predicate: str | list[str] | dict[str, bool] = {}, gamemode: Literal["survival", "creative", "adventure", "spectator"] | list[Literal["survival", "creative", "adventure", "spectator"]] | dict[Literal["survival", "creative", "adventure", "spectator"], bool] = {}, nbt: Value[Compound] | str | list[Value[Compound] | str | tuple[Value[Compound] | str, bool]] = [], origin: Position.World | None = None, dxdydz: tuple[float, float, float] | None = None, distance: str | None = None, pitch: str | None = None, yaw: str | None = None, level: str | None = None, limit: int | None = None, sort: Literal['nearest', 'furthest', 'random', 'arbitrary'] | None = None, **kwarg: str | list[str] | dict[str, bool]) -> None:
+      super().__init__(type, name, tag, team, scores, advancements, predicate, gamemode, nbt, origin, dxdydz, distance, pitch, yaw, level, limit, sort, **kwarg)
+      self.target = player
+
+class Objective:
+  """
+  スコアボードのobjective
+
+  idはスコアボード名
+  """  
+  @staticmethod
+  def List():
+    return Command('scoreboard objectives list')
+
+  def __init__(self,id:str) -> None:
+    self.id = id
+    
+  def Add(self,condition:str='dummy',display:str|None=None):
+    """
+    スコアボードを追加する
+
+    display:
+      表示名
+    """
+    if display is None:
+      return Command(f'scoreboard objectives add {self.id} {condition}')
+    else:
+      return Command(f'scoreboard objectives add {self.id} {condition} {display}')
+  
+  def Remove(self):
+    """
+    スコアボードを削除する
+    """
+    return Command(f'scoreboard objectives remove {self.id}')
+  
+  def Setdisplay(self,slot:str):
+    """
+    スコアボードを表示する
+
+    slot:
+      "sidebar" 等
+    """
+    return Command(f'scoreboard objectives setdisplay {slot} {self.id}')
+  
+  def ModifyDisplay(self,display:str):
+    """
+    スコアボードの表示名を変更する
+
+    display:
+      表示名
+    """
+    return Command(f'scoreboard objectives modify {self.id} {display}')
+
+  def score(self,entity:IEntitySelector|None):
+    """
+    エンティティのスコアを取得
+    """
+    return Scoreboard(self,entity)
+
+class Scoreboard:
+  @staticmethod
+  def List(entity:IEntitySelector|None):
+    """ 
+    エンティティに紐づいたスコアボード一覧を取得
+
+    entity:
+      None -> すべてのエンティティを対象にする
+    """
+    if entity is None:
+      return Command('scoreboard players list *')
+    return Command(f'scoreboard players list {entity.expression()}')
+  
+  def expression(self):
+    if self.entity is None:
+      return f'* {self.objective.id}'
+    return f'{self.entity.expression()} {self.objective.id}'
+
+  def __init__(self,objective:Objective,entity:IEntitySelector|None) -> None:
+    """ None:すべてのエンティティを対象にする """
+    self.objective = objective
+    self.entity = entity
+
+  def Get(self):
+    assert self.entity
+    return Command(f'scoreboard players get {self.expression()}')
+
+  def Set(self,value:int):
+    return Command(f'scoreboard players set {self.expression()} {value}')
+
+  def Add(self,value:int) -> Command:
+    if value <= -1:
+      return self.Remove(-value)
+    assert 0 <= value <= 2147483647
+    return Command(f'scoreboard players add {self.expression()} {value}')
+
+  def Remove(self,value:int) -> Command:
+    if value <= -1:
+      return self.Add(-value)
+    assert 0 <= value <= 2147483647
+    return Command(f'scoreboard players remove {self.expression()} {value}')
+  
+  def Reset(self):
+    return Command(f'scoreboard players reset {self.expression()}')
+  
+  def Enable(self):
+    return Command(f'scoreboard players enable {self.expression()}')
+  
+  def Oparation(self,other:Scoreboard,operator:Literal['+=','-=','*=','/=','%=','=','<','>','><']):
+    return Command(f'scoreboard players operation {self.expression()} {operator} {other.expression()}')
+  
+  def StoreResult(self):
+    return MC.StoreResultScore(self)
+  
+  def StoreSuccess(self):
+    return MC.StoreSuccessScore(self)
+
+  def IfMatch(self,start:int,stop:int|None=None):
+    return MC.IfScoreMatch(self,start,stop)
+
+  def UnlessMatch(self,start:int,stop:int|None=None):
+    return MC.UnlessScoreMatch(self,start,stop)
+
+  def If(self,target:Scoreboard,operator:Literal['<', '<=', '=', '>=', '>']):
+    return MC.IfScore(self,target,operator)
+
+  def Unless(self,target:Scoreboard,operator:Literal['<', '<=', '=', '>=', '>']):
+    return MC.UnlessScore(self,target,operator)
+
+  def jsontext(self) -> jsontextvalue:
+    assert self.entity is not None
+    return {'score':{'name':self.entity.expression(),'objective':self.objective.id}}
+
+class Item: 
+  @staticmethod
+  def customModel(id:str,modeldata:int):
+    return Item(id,{'CustomModelData':Int(modeldata)})
+
+  def __init__(self,id:str,nbt:dict[str,Value[INbt]]|None=None) -> None:
+    """
+    アイテム/アイテムタグ
+
+    id:
+      "minecraft:stone" / "#logs"  / ...
+
+    blockstates:
+      {"axis":"x"} / ...
+
+    nbt:
+      {"Items":List[Compound]\\([])} / ...
+    """
+    self.id = id
+    self.isTag = self.id.startswith('#')
+    self.nbt = nbt
+
+  def Give(self,count:int):
+    if self.isTag:
+      raise ValueError(f'cannot set blocktag: {self.expression()}')
+    return MC.Give(self,count)
+
+  def expression(self):
+    result = self.id
+    if self.nbt is not None:
+      result += Compound(self.nbt).str()
+    return result
+
+  def ToNbt(self,count:int|None=None):
+    """
+    {"id":"minecraft:stone","Count":1b,"tag":{}}
+    """
+    value:dict[str, Value[INbt]] = {'id':Str(self.id)}
+    if count:
+      value['Count'] = Byte(count)
+    if self.nbt is not None:
+      value['tag'] = Compound(self.nbt)
+    return Compound(value)
+
+  def withNbt(self,nbt:dict[str,Value[INbt]]):
+    nbt = self.nbt|nbt if self.nbt is not None else nbt
+    return Item(self.id,nbt)
+
+class Block:
+  def __init__(self,id:str,blockstates:dict[str,str]={},nbt:dict[str,Value[INbt]]|None=None) -> None:
+    """
+    ブロック/ブロックタグ
+
+    id:
+      "minecraft:stone" / "#logs"  / ...
+
+    blockstates:
+      {"axis":"x"} / ...
+
+    nbt:
+      {"Items":List[Compound]\\([])} / ...
+    """
+    self.isTag = self.id.startswith('#')
+    self.id = id
+    self.blockstates = blockstates
+    self.nbt = nbt
+
+  def SetBlock(self,pos:IPosition):
+    if self.isTag:
+      raise ValueError(f'cannot set blocktag: {self.expression()}')
+    return MC.SetBlock(self,pos)
+
+  def IfBlock(self,pos:IPosition):
+    return MC.IfBlock(pos,self)
+
+  def expression(self):
+    result = self.id
+    if self.blockstates:
+      result += f'[{",".join( f"{k}={v}" for k,v in self.blockstates.items())}]'
+    if self.nbt is not None:
+      result += Compound(self.nbt).str()
+    return result
+
+  def withNbt(self,nbt:dict[str,Value[INbt]]):
+    nbt = self.nbt|nbt if self.nbt is not None else nbt
+    return Block(self.id,self.blockstates,nbt)
+
+  def withStates(self,blockstates:dict[str,str]):
+    blockstates = self.blockstates|blockstates
+    return Block(self.id,blockstates,self.nbt)
+
+@runtime_checkable
+class _IJsonTextable(Protocol):
+  @abstractmethod
+  def jsontext(self) -> jsontextvalue:pass
+
+def evaljsontext(jsontext:jsontext) -> jsontextvalue:
+  match jsontext:
+    case str():
+      return jsontext
+    case _IJsonTextable():
+      return jsontext.jsontext()
+    case list():
+      return list(map(evaljsontext,jsontext))
+
+jsontext:TypeAlias = str|_IJsonTextable|list['jsontext']
+
+jsontextvalue:TypeAlias = str|list['jsontextvalue']|dict[str,Union[dict[str,str|dict[str,str]],bool,'jsontextvalue']] #type:ignore
+
+class JsonText:
+  class Decotation:
+    """
+    tellrawや看板で使うjsontextを装飾する
+    """
+    def __init__(
+        self,
+        value:_IJsonTextable,
+        color:str|None=None,
+        font:str|None=None,
+        bold:bool|None=None,
+        italic:bool|None=None,
+        underlined:bool|None=None,
+        strikethrough:bool|None=None,
+        obfuscated:bool|None=None,
+        insertion:str|None=None,
+        click_run_command:Command|None=None,
+        click_suggest_command:Command|str|None=None,
+        click_copy_to_clipboard:str|None=None,
+        click_open_url:str|None=None,
+        click_change_page:int|None=None,
+        hover_show_text:str|None=None,
+        hover_show_item:Item|None=None,
+        hover_show_entity:tuple[str,str,str]|None=None,
+      ) -> None:
+      """
+      color: '#000000','reset','black','dark_blue','dark_green','dark_aqua','dark_red','dark_purple','gold','gray','dark_gray','blue','green','aqua','red','light_purple','yellow','white'
+
+      click_run_command / click_suggest_command / click_copy_to_clipboard / click_open_url / click_change_page はどれか1つまで
+
+      hover_show_text / hover_show_item / hover_show_entity はどれか1つまで
+      """
+      self.value = value
+      self.color = color
+      self.font = font
+      self.bold = bold
+      self.italic = italic
+      self.underlined = underlined
+      self.strikethrough = strikethrough
+      self.obfuscated = obfuscated
+      self.insertion = insertion
+      self.click_run_command = click_run_command
+      self.click_suggest_command = click_suggest_command
+      self.click_copy_to_clipboard = click_copy_to_clipboard
+      self.click_open_url = click_open_url
+      self.click_change_page = click_change_page
+      self.hover_show_text = hover_show_text
+      self.hover_show_item = hover_show_item
+      self.hover_show_entity = hover_show_entity
+
+    def jsontext(self) -> jsontextvalue:
+      value = self.value.jsontext()
+      assert isinstance(value,dict)
+      def setValue(key:str,v:bool|str|None):
+        if v is not None:
+          value[key] = v
+
+      setValue('color',self.color)
+      setValue('font',self.font)
+      setValue('bold',self.bold)
+      setValue('italic',self.italic)
+      setValue('underlined',self.underlined)
+      setValue('strikethrough',self.strikethrough)
+      setValue('obfuscated',self.obfuscated)
+      setValue('insertion',self.insertion)
+
+      if self.click_run_command:
+        value["clickEvent"] = {"action":"run_command","value":self.click_run_command.export()}
+      elif self.click_suggest_command:
+        cmd = self.click_suggest_command
+        if isinstance(cmd,Command):
+          cmd = cmd.export()
+        value["clickEvent"] = {"action":"suggest_command","value":cmd}
+      elif self.click_copy_to_clipboard:
+        value["clickEvent"] = {"action":"copy_to_clipboard","value":self.click_copy_to_clipboard}
+      elif self.click_open_url:
+        value["clickEvent"] = {"action":"open_url","value":self.click_open_url}
+
+      if self.hover_show_text:
+        value["hoverEvent"] = {"action":"show_text","contents":self.hover_show_text}
+      elif self.hover_show_item:
+        raise NotImplementedError('hover_show_item is not implemented')
+      elif self.hover_show_entity:
+        value["hoverEvent"] = {"action":"show_entity","contents":{
+          "name":self.hover_show_entity[0],
+          "type":self.hover_show_entity[1],
+          "id":self.hover_show_entity[2]
+        }}
+      return value
+
+  class Translate:
+    """
+    tellrawや看板で使うjsontextのtranslate
+    """
+    def __init__(self,key:str,with_:list[jsontext]) -> None:
+      self.key = key
+      self.with_ = with_
+
+    def jsontext(self) -> jsontextvalue:
+      return {"translate":self.key,"with": list(map(evaljsontext,self.with_))}
+
+  class Keybind:
+    """
+    tellrawや看板で使うjsontextのkeybind
+    """
+    def __init__(self,key:str) -> None:
+      self.key = key
+
+    def jsontext(self) -> jsontextvalue:
+      return {"keybind":self.key}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 本来は別ファイルとしてdatapack.libralyに格納すべきだが、
+# 組み込んでおいたほうがエンティティセレクタから呼び出せて便利なので組み込む
+class OhMyDat(IDatapackLibrary):
+  using = False
+
+  @classmethod
+  def install(cls,datapack_path:Path) -> None:
+    if not (datapack_path.parent/"OhMyDat").exists():
+      print("installing OhMyDat")
+      cp = subprocess.run(['git', 'clone', 'https://github.com/Ai-Akaishi/OhMyDat.git'],cwd=datapack_path.parent, encoding='utf-8', stderr=subprocess.PIPE)
+      if cp.returncode != 0:
+        raise ImportError(cp.stderr)
+
+  @classmethod
+  def uninstall(cls,datapack_path:Path) -> None:
+    if (datapack_path.parent/"OhMyDat").exists():
+      print("uninstalling OhMyDat")
+      cls.rmtree(datapack_path.parent/"OhMyDat")
+
+  @classmethod
+  def Please(cls):
+    cls.using = True
+    return Command('function #oh_my_dat:please')
+
+  _storage = StorageNbt('oh_my_dat:')
+  _data = _storage['_',List[List[List[List[List[List[List[List[Compound]]]]]]]]][-4][-4][-4][-4][-4][-4][-4][-4]
+  _scoreboard = Scoreboard(Objective('OhMyDatID'),EntitySelector.Player('_'))
+
+  @property
+  @classmethod
+  def data(cls):
+    """エンティティごとのデータが格納されているstorage (Compound)"""
+    cls.using = True
+    return cls._data
+
+  @classmethod
+  def PleaseScore(cls,score:Scoreboard):
+    """scoreboardのidにアクセス"""
+    cls.using = True
+    f = Function()
+    f += cls._scoreboard.Oparation(score,'=')
+    f += Command('function #oh_its_dat:please')
+    return f.call()
+
+  @classmethod
+  def PleaseResult(cls,cmd:Command):
+    """コマンドの実行結果のidにアクセス"""
+    cls.using = True
+    f = Function()
+    f += cls._scoreboard.StoreResult() + cmd
+    f += Command('function #oh_its_dat:please')
+    return f.call()
+
+  @classmethod
+  def Release(cls):
+    """
+    明示的にストレージを開放
+
+    他のデータパックのデータを消してしまう恐れがあるため使わない
+    """
+    cls.using = True
+    return Command('function #oh_my_dat:release')
+
