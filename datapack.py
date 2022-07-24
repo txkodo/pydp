@@ -204,7 +204,7 @@ class SubCommand:
     """ execute store success bossbar {id} value|max {score} """
     return self + Execute.StoreSuccessBossbar(id,case)
 
-  def Run(self,command:str):
+  def Run(command:Command|str):
     """ execute run {command} """
     return self + Execute.Run(command)
 
@@ -965,8 +965,10 @@ class Execute:
     return SubCommand(f'store success bossbar {id} {case}')
   
   @staticmethod
-  def Run(command:str):
-    return Command(command)
+  def Run(command:Command|str):
+    if isinstance(command,str):
+      return Command(command)
+    return command
 
 
 
