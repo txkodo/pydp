@@ -204,7 +204,7 @@ class SubCommand:
     """ execute store success bossbar {id} value|max {score} """
     return self + Execute.StoreSuccessBossbar(id,case)
 
-  def Run(command:Command|str):
+  def Run(self,command:Command|str):
     """ execute run {command} """
     return self + Execute.Run(command)
 
