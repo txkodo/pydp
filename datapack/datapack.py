@@ -7,7 +7,7 @@ from pathlib import Path
 from random import randint
 import re
 import shutil
-from typing import Any, Callable, Generic, Literal, Protocol, TypeAlias, TypeGuard, TypeVar, get_args, overload, Union, runtime_checkable
+from typing import Any, Callable, Generic, Literal, Protocol, TypeAlias, TypeGuard, TypeVar, final, get_args, overload, Union, runtime_checkable
 from typing_extensions import Self
 import subprocess
 
@@ -983,8 +983,9 @@ class NbtPath:
       パスをdictの内容で絞るためのパス
       """
     
-    @abstractmethod
-    def str(self)->str:pass
+    @final
+    def str(self)->str:
+      return f"{self.typestr} {self.holderstr} {self.pathstr}"
 
     def get(self,scale:float|None=None):
       if scale is None:
@@ -993,6 +994,22 @@ class NbtPath:
 
     def store(self,mode:Literal['result','success'],type:Literal['byte','short','int','long','float','double'],scale:float=1):
       return SubCommand(f'store {mode} {self.str()} {type} {_float_to_str(scale or 1.0)}')
+
+    @property
+    def to_jsontext(self) -> jsontextvalue:
+      return {"nbt":self.pathstr,self.typestr:self.holderstr}
+    
+    @property
+    def typestr(self) -> str:
+      return self._parent.typestr
+
+    @property
+    def holderstr(self) -> str:
+      return self._parent.holderstr
+
+    @property
+    @abstractmethod
+    def pathstr(self) -> str:pass
 
   class Root(INbtPath):
     """stoarge a:b {}"""
@@ -1007,11 +1024,17 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       return NbtPath.RootMatch(self._type,self._holder,value)
 
-    def holer(self)->str:
-      return f'{self._type} {self._holder}'
+    @property
+    def pathstr(self)->str:
+      return f'{{}}'
 
-    def str(self)->str:
-      return f'{self._type} {self._holder} {{}}'
+    @property
+    def typestr(self) -> str:
+      return self._type
+
+    @property
+    def holderstr(self) -> str:
+      return self._holder
 
   class RootMatch(INbtPath):
     """stoarge a:b {bar:buz}"""
@@ -1026,9 +1049,18 @@ class NbtPath:
 
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       return NbtPath.RootMatch(self._type,self._holder,Compound.mergeValue(self._condition,value))
-
-    def str(self)->str:
+    
+    @property
+    def pathstr(self)->str:
       return self._condition.str()
+
+    @property
+    def typestr(self) -> str:
+      return self._type
+
+    @property
+    def holderstr(self) -> str:
+      return self._holder
 
   class Child(INbtPath):
     """stoarge a:b foo.bar"""
@@ -1042,10 +1074,11 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       return NbtPath.ChildMatch(self._parent,self._value,value)
 
-    def str(self)->str:
+    @property
+    def pathstr(self)->str:
       if isinstance(self._parent,NbtPath.Root):
-        return f'{self._parent.holer()} {self._value}'
-      return self._parent.str() + '.' + self._value
+        return self._value
+      return self._parent.pathstr + '.' + self._value
 
   class ChildMatch(INbtPath):
     """stoarge a:b foo.bar{buz:qux}"""
@@ -1061,10 +1094,11 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       return NbtPath.ChildMatch(self._parent,self._value,value)
 
-    def str(self)->str:
+    @property
+    def pathstr(self)->str:
       if isinstance(self._parent,NbtPath.Root):
-        return f'{self._parent.holer()} {self._value}{self._condition.str()}'
-      return self._parent.str() + '.' + self._value + self._condition.str()
+        return f'{self._value}{self._condition.str()}'
+      return self._parent.pathstr + '.' + self._value + self._condition.str()
 
   class Index(INbtPath):
     """stoarge a:b foo.bar[0]"""
@@ -1078,8 +1112,9 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       raise TypeError('indexed nbt value cannot be filtered')
 
-    def str(self)->str:
-      return f'{self._parent.str()}[{self._index}]'
+    @property
+    def pathstr(self)->str:
+      return f'{self._parent.pathstr}[{self._index}]'
 
   class All(INbtPath):
     """stoarge a:b  foo.bar[]"""
@@ -1095,8 +1130,9 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       raise TypeError('indexed nbt value cannot be filtered')
 
-    def str(self)->str:
-      return f'{self._parent.str()}[]'
+    @property
+    def pathstr(self)->str:
+      return f'{self._parent.pathstr}[]'
 
   class AllMatch(INbtPath):
     """stoarge a:b foo.bar[{buz:qux}]"""
@@ -1111,8 +1147,9 @@ class NbtPath:
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       raise TypeError('indexed nbt value cannot be filtered')
 
-    def str(self)->str:
-      return f'{self._parent.str()}[{self._condition.str()}]'
+    @property
+    def pathstr(self)->str:
+      return f'{self._parent.pathstr}[{self._condition.str()}]'
 
 T = TypeVar('T')
 
@@ -1163,6 +1200,9 @@ class INbt:
       return Command(f"data modify {self.path} set value {value.str()}")
     else:
       return Command(f"data modify {self.path} set from {value.path}")
+
+  def jsontext(self) -> jsontextvalue:
+    return self._path.to_jsontext
 
 NBT = TypeVar('NBT',bound = INbt)
 CO_NBT = TypeVar('CO_NBT',bound = INbt,covariant=True)
@@ -2012,7 +2052,7 @@ def evaljsontext(jsontext:jsontext) -> jsontextvalue:
 
 jsontext:TypeAlias = str|_IJsonTextable|list['jsontext']
 
-jsontextvalue:TypeAlias = str|list['jsontextvalue']|dict[str,Union[dict[str,str|dict[str,str]],bool,'jsontextvalue']] #type:ignore
+jsontextvalue:TypeAlias = str|list['jsontextvalue']|dict[str,Union[dict[str,str|dict[str,str]],bool,'jsontextvalue']]
 
 class JsonText:
   class Decotation:
