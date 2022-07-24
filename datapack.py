@@ -13,18 +13,18 @@ import subprocess
 
 
 def _float_to_str(f:float):
-    float_string = repr(f)
-    if 'e' in float_string:  # detect scientific notation
-        digits, exp = float_string.split('e')
-        digits = digits.replace('.', '').replace('-', '')
-        exp = int(exp)
-        zero_padding = '0' * (abs(int(exp)) - 1)  # minus 1 for decimal point in the sci notation
-        sign = '-' if f < 0 else ''
-        if exp > 0:
-            float_string = '{}{}{}.0'.format(sign, digits, zero_padding)
-        else:
-            float_string = '{}0.{}{}'.format(sign, zero_padding, digits)
-    return float_string
+  float_string = repr(f)
+  if 'e' in float_string:  # detect scientific notation
+      digits, exp = float_string.split('e')
+      digits = digits.replace('.', '').replace('-', '')
+      exp = int(exp)
+      zero_padding = '0' * (abs(int(exp)) - 1)  # minus 1 for decimal point in the sci notation
+      sign = '-' if f < 0 else ''
+      if exp > 0:
+          float_string = '{}{}{}.0'.format(sign, digits, zero_padding)
+      else:
+          float_string = '{}0.{}{}'.format(sign, zero_padding, digits)
+  return float_string
 
 _id_upper  = tuple(map(chr,range(ord('A'),ord('Z')+1)))
 _id_lower  = tuple(map(chr,range(ord('a'),ord('z')+1)))
@@ -2090,7 +2090,7 @@ class JsonText:
     """
     def __init__(
         self,
-        value:_IJsonTextable,
+        value:jsontext,
         color:str|None=None,
         font:str|None=None,
         bold:bool|None=None,
@@ -2134,8 +2134,19 @@ class JsonText:
       self.hover_show_entity = hover_show_entity
 
     def jsontext(self) -> jsontextvalue:
-      value = self.value.jsontext()
-      assert isinstance(value,dict)
+      jtext = evaljsontext(self.value)
+      match jtext:
+        case str():
+          value:jsontextvalue = {"text":""}
+          result = value
+        case list():
+          value:jsontextvalue = {"text":""}
+          jtext.insert(0,value)
+          result = jtext
+        case _:
+          value = jtext
+          result = value
+
       def setValue(key:str,v:bool|str|None):
         if v is not None:
           value[key] = v
@@ -2171,7 +2182,7 @@ class JsonText:
           "type":self.hover_show_entity[1],
           "id":self.hover_show_entity[2]
         }}
-      return value
+      return result
 
   class Translate:
     """
