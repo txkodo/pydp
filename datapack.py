@@ -510,7 +510,7 @@ class Datapack(metaclass=DatapackMeta):
   created_paths:list[Path] = []
 
   @staticmethod
-  def export(path:Path,default_namespace:str|None=None,default_folder:str|None=None):
+  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None):
     """
     データパックを指定パスに出力する
 
@@ -531,6 +531,8 @@ class Datapack(metaclass=DatapackMeta):
 
       例 : '', 'foo/', 'foo/bar/'
     """
+
+    path = Path(path)
 
     if default_namespace is not None: Datapack.default_namespace = default_namespace
     if default_folder is not None: Datapack.default_folder = default_folder
