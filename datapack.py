@@ -98,115 +98,115 @@ class SubCommand:
 
   def As(self,entity:IEntitySelector):
     """ execute as @ """
-    return self + MC.As(entity)
+    return self + Execute.As(entity)
 
   def At(self,entity:IEntitySelector):
     """ execute at @ """
-    return self + MC.At(entity)
+    return self + Execute.At(entity)
 
   def Positioned(self,pos:IPosition):
     """ execute positioned ~ ~ ~ """
-    return self + MC.Positioned(pos)
+    return self + Execute.Positioned(pos)
 
   def PositionedAs(self,entity:IEntitySelector):
     """ execute positioned as @ """
-    return self + MC.PositionedAs(entity)
+    return self + Execute.PositionedAs(entity)
 
   def Align(self,axes:Literal['x','y','z','xy','yz','xz','xyz']):
     """ execute align xyz """
-    return self + MC.Align(axes)
+    return self + Execute.Align(axes)
     
   def Facing(self,pos:IPosition):
     """ execute facing ~ ~ ~ """
-    return self + MC.Facing(pos)
+    return self + Execute.Facing(pos)
 
   def FacingEntity(self,entity:IEntitySelector):
     """ execute facing entity @ """
-    return self + MC.FacingEntity(entity)
+    return self + Execute.FacingEntity(entity)
 
   def Rotated(self,yaw:float,pitch:float):
     """ execute rotated ~ ~ """
-    return self + MC.Rotated(yaw,pitch)
+    return self + Execute.Rotated(yaw,pitch)
 
   def RotatedAs(self,target:IEntitySelector):
     """ execute rotated as @ """
-    return self + MC.RotatedAs(target)
+    return self + Execute.RotatedAs(target)
 
   def In(self,dimension:str):
     """ execute in {dimension} """
-    return self + MC.In(dimension)
+    return self + Execute.In(dimension)
 
   def Anchored(self,anchor:Literal['feet','eyes']):
     """ execute anchored feet|eyes """
-    return self + MC.Anchored(anchor)
+    return self + Execute.Anchored(anchor)
 
   def IfBlock(self,pos:IPosition,block:Block):
     """ execute if block ~ ~ ~ {block} """
-    return self + MC.IfBlock(pos,block)
+    return self + Execute.IfBlock(pos,block)
 
   def UnlessBlock(self,pos:IPosition,block:str):
     """ execute unless block ~ ~ ~ {block} """
-    return self + MC.UnlessBlock(pos,block)
+    return self + Execute.UnlessBlock(pos,block)
 
   def IfBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
     """ execute if blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
-    return self + MC.IfBlocks(begin,end,destination,method)
+    return self + Execute.IfBlocks(begin,end,destination,method)
 
   def UnlessBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
     """ execute unless blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
-    return self + MC.UnlessBlocks(begin,end,destination,method)
+    return self + Execute.UnlessBlocks(begin,end,destination,method)
 
   def IfEntity(self,entity:IEntitySelector):
     """ execute if entity {entity} """
-    return self + MC.IfEntity(entity)
+    return self + Execute.IfEntity(entity)
 
   def UnlessEntity(self,entity:IEntitySelector):
     """ execute unless entity {entity} """
-    return self + MC.UnlessEntity(entity)
+    return self + Execute.UnlessEntity(entity)
 
   def IfScore(self,target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
     """ execute if score {entity} {operator} {source} """
-    return self + MC.IfScore(target,source,operator)
+    return self + Execute.IfScore(target,source,operator)
 
   def IfScoreMatch(self,target:Scoreboard,start:int,stop:int|None=None):
     """ execute if score {entity} matches {start}..{stop} """
-    return self + MC.IfScoreMatch(target,start,stop)
+    return self + Execute.IfScoreMatch(target,start,stop)
 
   def UnlessScore(self,target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
     """ execute unless score {entity} {operator} {source} """
-    return self + MC.UnlessScore(target,source,operator)  
+    return self + Execute.UnlessScore(target,source,operator)  
 
   def UnlessScoreMatch(self,target:Scoreboard,start:int,stop:int|None=None):
     """ execute unless score {entity} matches {start}..{stop} """
-    return self + MC.UnlessScoreMatch(target,start,stop)
+    return self + Execute.UnlessScoreMatch(target,start,stop)
 
   def StoreResultNbt(self,nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
     """ execute store result {nbt} {scale} """
-    return self + MC.StoreResultNbt(nbt,scale)
+    return self + Execute.StoreResultNbt(nbt,scale)
 
   def StoreSuccessNbt(self,nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
     """ execute store success {nbt} {scale} """
-    return self + MC.StoreSuccessNbt(nbt,scale)
+    return self + Execute.StoreSuccessNbt(nbt,scale)
 
   def StoreResultScore(self,score:Scoreboard):
     """ execute store result score {score} """
-    return self + MC.StoreResultScore(score)
+    return self + Execute.StoreResultScore(score)
 
   def StoreSuccessScore(self,score:Scoreboard):
     """ execute store success score {score} """
-    return self + MC.StoreSuccessScore(score)
+    return self + Execute.StoreSuccessScore(score)
 
   def StoreResultBossbar(self,id:str,case:Literal['value','max']):
     """ execute store result bossbar {id} value|max {score} """
-    return self + MC.StoreResultBossbar(id,case)
+    return self + Execute.StoreResultBossbar(id,case)
 
   def StoreSuccessBossbar(self,id:str,case:Literal['value','max']):
     """ execute store success bossbar {id} value|max {score} """
-    return self + MC.StoreSuccessBossbar(id,case)
+    return self + Execute.StoreSuccessBossbar(id,case)
 
   def Run(self,command:str):
     """ execute run {command} """
-    return self + MC.Run(command)
+    return self + Execute.Run(command)
 
 
 class Command:
@@ -214,13 +214,143 @@ class Command:
   def __init__(self,content:str) -> None:
     self.subcommands:list[str] = []
     self.content = content
-
+  
   def export(self) -> str:
-    result = self.content
+    result = self._command
     if self.subcommands:
       return "execute " + " ".join(self.subcommands) + " run " + result
     else:
       return result
+
+  @property
+  def _command(self) -> str:
+    return self.content
+
+  @staticmethod
+  def Say(content:str):
+    return Command(f'say {content}')
+
+  @staticmethod
+  def Tellraw(entity:IEntitySelector,*value:jsontext):
+    v = "" if len(value) == 0 else evaljsontext(value[0] if len(value) == 1 else list(value))
+    return Command(f'tellraw {entity.expression()} {json.dumps(v)}')
+
+  @staticmethod
+  def Summon(type:str,pos:IPosition,**nbt:Value[INbt]):
+    if nbt:
+      return Command(f'summon {type} {pos.expression()} {Compound(nbt).str()}')
+    return Command(f'summon {type} {pos.expression()}')
+  
+  @staticmethod
+  def Kill(selector:IEntitySelector):
+    return Command(f'kill {selector.expression()}')
+  
+  class Tag:
+    @staticmethod
+    def List(entity:IEntitySelector):
+      return Command(f'tag {entity.expression()} list')
+
+    @staticmethod
+    def Add(entity:IEntitySelector,tag:str):
+      return Command(f'tag {entity.expression()} add {tag}')
+
+    @staticmethod
+    def Remove(entity:IEntitySelector,tag:str):
+      return Command(f'tag {entity.expression()} remove {tag}')
+
+  @staticmethod
+  def CallFunc(function:str):
+    return Command(f'function {function}')
+
+  @staticmethod
+  def SetBlock(block:Block,pos:IPosition,mode:Literal['destroy','keep','replace']|None=None):
+    if mode:
+      return Command(f'setblock {pos.expression()} {block.expression()} {mode}')
+    return Command(f'setblock {pos.expression()} {block.expression()}')
+  
+  @staticmethod
+  def Fill(start:IPosition,end:IPosition,block:Block,mode:Literal['destroy','hollow','keep','outline','replace']|None=None,oldblock:Block|None=None)->Command:
+    if mode == 'replace':
+      if oldblock is None:
+        raise ValueError('fill mode "replace" needs argument "oldblock"')
+      return Command(f'fill {start.expression()} {end.expression()} {block.expression()} replace {oldblock.expression()}')
+    if oldblock is not None:
+      raise ValueError(f'''fill mode "{mode}" doesn't needs argument "oldblock"''')
+    return Command(f'fill {start.expression()} {end.expression()} {block.expression()} {mode}')
+
+  @staticmethod
+  def Clone(
+      start:IPosition,
+      end:IPosition,
+      target:IPosition,
+      maskmode:Literal['replace','masked','filtered']|None=None,
+      clonemode:Literal['normal','force','move']|None=None,
+      filterblock:Block|None=None
+    ):
+    clonemode_suffix = '' if clonemode is None else ' '+clonemode
+    if maskmode == 'filtered':
+      if filterblock is None:
+        raise ValueError('clone mode "replace" needs argument "filterblock"')
+      return Command(f'clone {start.expression()} {end.expression()} {target.expression()} filtered {filterblock.expression()}' + clonemode_suffix)
+
+    if filterblock is not None:
+      raise ValueError(f'''clone mode "{maskmode}" doesn't needs argument "filterblock"''')
+    if maskmode is None:
+      if clonemode is not None:
+        raise ValueError(f'"clonemode" argument needs to be used with "maskmode" argument')
+      return Command(f'clone {start.expression()} {end.expression()} {target.expression()}')
+    return Command(f'clone {start.expression()} {end.expression()} {target.expression()} {maskmode}'+clonemode_suffix)
+
+  @staticmethod
+  def Give(item:Item,count:int):
+    return Command(f'give {item.expression()} {count}')
+
+  @staticmethod
+  def Clear(entity:IEntitySelector,item:Item|None=None,maxcount:int|None=None):
+    cmd = f'clear {entity.expression()}'
+    if item:
+      cmd += f' {item.expression()}'
+      if maxcount:
+        cmd += f' {maxcount}'
+    return Command(cmd)
+  
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int)->Command:pass
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
+  @overload
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  @staticmethod
+  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+    cmd = f'particke {id} {pos.expression()} {dx} {dy} {dz} {speed} {count}'
+    if mode:
+      cmd += ' '+mode
+    if entity:
+      cmd += ' '+entity.expression()
+    return Command(cmd)
+  
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str)->Command:pass
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
+  @overload
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  @staticmethod
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+    """
+    colorcode:
+      "#000000"
+    """
+    return Command.Particle(id,pos,int(colorcode[1:3])/100,int(colorcode[3:5])/100,int(colorcode[5:7])/100,1,0,mode,entity) #type:ignore
+
+
+
 
 class ConditionSubCommand(SubCommand,Command):
   """ if / unless """
@@ -234,7 +364,8 @@ class _FunctionCommand(Command):
     super().__init__('')
     self.holder = holder
 
-  def export(self) -> str:
+  @property
+  def _command(self) -> str:
     raise NotImplementedError
 
 class _ScheduleCommand(Command):
@@ -245,7 +376,8 @@ class _ScheduleCommand(Command):
     self.tick = tick
     self.append = append
 
-  def export(self) -> str:
+  @property
+  def _command(self) -> str:
     return f'schedule function {self.holder.expression} {self.tick}t {"append" if self.append else "replace"}'
 
 class _ScheduleClearCommand(Command):
@@ -254,7 +386,8 @@ class _ScheduleClearCommand(Command):
     super().__init__('')
     self.holder = holder
 
-  def export(self) -> str:
+  @property
+  def _command(self) -> str:
     return f'schedule clear {self.holder.expression}'
 
 class FunctionTag:
@@ -348,13 +481,36 @@ class IDatapackLibrary:
     """
     raise NotImplementedError
 
-class Datapack:
-  default_namespace:str
-  default_folder:str
+class DatapackMeta(type):
+  _default_namespace:str = '_'
+
+  @property
+  def default_namespace(cls):
+    return cls._default_namespace
+
+  @default_namespace.setter
+  def default_namespace(cls,value:str):
+    if not re.fullmatch('[0-9a-z_-]+',value):
+      raise ValueError(f'default_namespace argument must match /[0-9a-z_-]+/ not "{value}"')
+    cls._default_namespace = value
+
+  _default_folder:str = ''
+
+  @property
+  def default_folder(cls):
+    return cls._default_folder
+
+  @default_folder.setter
+  def default_folder(cls,value:str):
+    if not re.fullmatch(r'([0-9a-z_\.-]+/)*',value):
+      raise ValueError(fr'default_folder argument must match /([0-9a-z_\.-]+/)*/ not "{value}"')
+    cls._default_folder = value
+
+class Datapack(metaclass=DatapackMeta):
   created_paths:list[Path] = []
 
   @staticmethod
-  def export(path:Path,default_namespace:str='_',default_folder:str=''):
+  def export(path:Path,default_namespace:str|None=None,default_folder:str|None=None):
     """
     データパックを指定パスに出力する
 
@@ -375,14 +531,9 @@ class Datapack:
 
       例 : '', 'foo/', 'foo/bar/'
     """
-    if not re.fullmatch('[0-9a-z_-]+',default_namespace):
-      raise ValueError(f'default_namespace argument must match /[0-9a-z_-]+/ not "{default_namespace}"')
 
-    if not re.fullmatch(r'([0-9a-z_\.-]+/)*',default_folder):
-      raise ValueError(fr'default_folder argument must match /([0-9a-z_\.-]+/)*/ not "{default_folder}"')
-
-    Datapack.default_namespace = default_namespace
-    Datapack.default_folder = default_folder
+    if default_namespace is not None: Datapack.default_namespace = default_namespace
+    if default_folder is not None: Datapack.default_folder = default_folder
 
     for library in IDatapackLibrary.__subclasses__():
       if library.using:
@@ -454,8 +605,6 @@ class _FuncState(Enum):
 
 class Function:
   functions:list[Function] = []
-
-
 
   @classmethod
   def nextPath(cls) -> str:
@@ -638,8 +787,10 @@ class Function:
         if isinstance(cmd,_FunctionCommand):
           cmd.holder.export_commands(path,commands,subcommand + cmd.subcommands)
         else:
+          s = cmd.subcommands
           cmd.subcommands = subcommand + cmd.subcommands
           commands.append(cmd.export())
+          cmd.subcommands = s
       case _FuncState.EXPORT:
         cmds:list[str] = []
         for cmd in self.commands:
@@ -690,7 +841,7 @@ class Function:
 
 
 
-class MC:
+class Execute:
   """
   コマンド/サブコマンド生成メソッドをまとめたstaticクラス
 
@@ -817,128 +968,6 @@ class MC:
   def Run(command:str):
     return Command(command)
 
-  @staticmethod
-  def Say(content:str):
-    return Command(f'say {content}')
-
-  @staticmethod
-  def Tellraw(entity:IEntitySelector,*value:jsontext):
-    v = "" if len(value) == 0 else evaljsontext(value[0] if len(value) == 1 else list(value))
-    return Command(f'tellraw {entity.expression()} {json.dumps(v)}')
-
-  @staticmethod
-  def Summon(type:str,pos:IPosition,**nbt:Value[INbt]):
-    if nbt:
-      return Command(f'summon {type} {pos.expression()} {Compound(nbt).str()}')
-    return Command(f'summon {type} {pos.expression()}')
-  
-  @staticmethod
-  def Kill(selector:IEntitySelector):
-    return Command(f'kill {selector.expression()}')
-  
-  class Tag:
-    @staticmethod
-    def List(entity:IEntitySelector):
-      return Command(f'tag {entity.expression()} list')
-
-    @staticmethod
-    def Add(entity:IEntitySelector,tag:str):
-      return Command(f'tag {entity.expression()} add {tag}')
-
-    @staticmethod
-    def Remove(entity:IEntitySelector,tag:str):
-      return Command(f'tag {entity.expression()} remove {tag}')
-
-  @staticmethod
-  def CallFunc(function:str):
-    return Command(f'function {function}')
-
-  @staticmethod
-  def SetBlock(block:Block,pos:IPosition,mode:Literal['destroy','keep','replace']|None=None):
-    if mode:
-      return Command(f'setblock {pos.expression()} {block.expression()} {mode}')
-    return Command(f'setblock {pos.expression()} {block.expression()}')
-  
-  @staticmethod
-  def Fill(start:IPosition,end:IPosition,block:Block,mode:Literal['destroy','hollow','keep','outline','replace']|None=None,oldblock:Block|None=None)->Command:
-    if mode == 'replace':
-      if oldblock is None:
-        raise ValueError('fill mode "replace" needs argument "oldblock"')
-      return Command(f'fill {start.expression()} {end.expression()} {block.expression()} replace {oldblock.expression()}')
-    if oldblock is not None:
-      raise ValueError(f'''fill mode "{mode}" doesn't needs argument "oldblock"''')
-    return Command(f'fill {start.expression()} {end.expression()} {block.expression()} {mode}')
-
-  @staticmethod
-  def Clone(
-      start:IPosition,
-      end:IPosition,
-      target:IPosition,
-      maskmode:Literal['replace','masked','filtered']|None=None,
-      clonemode:Literal['normal','force','move']|None=None,
-      filterblock:Block|None=None
-    ):
-    clonemode_suffix = '' if clonemode is None else ' '+clonemode
-    if maskmode == 'filtered':
-      if filterblock is None:
-        raise ValueError('clone mode "replace" needs argument "filterblock"')
-      return Command(f'clone {start.expression()} {end.expression()} {target.expression()} filtered {filterblock.expression()}' + clonemode_suffix)
-
-    if filterblock is not None:
-      raise ValueError(f'''clone mode "{maskmode}" doesn't needs argument "filterblock"''')
-    if maskmode is None:
-      if clonemode is not None:
-        raise ValueError(f'"clonemode" argument needs to be used with "maskmode" argument')
-      return Command(f'clone {start.expression()} {end.expression()} {target.expression()}')
-    return Command(f'clone {start.expression()} {end.expression()} {target.expression()} {maskmode}'+clonemode_suffix)
-
-  @staticmethod
-  def Give(item:Item,count:int):
-    return Command(f'give {item.expression()} {count}')
-
-  @staticmethod
-  def Clear(entity:IEntitySelector,item:Item|None=None,maxcount:int|None=None):
-    cmd = f'clear {entity.expression()}'
-    if item:
-      cmd += f' {item.expression()}'
-      if maxcount:
-        cmd += f' {maxcount}'
-    return Command(cmd)
-  
-  @overload
-  @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int)->Command:pass
-  @overload
-  @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
-  @overload
-  @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
-  @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
-    cmd = f'particke {id} {pos.expression()} {dx} {dy} {dz} {speed} {count}'
-    if mode:
-      cmd += ' '+mode
-    if entity:
-      cmd += ' '+entity.expression()
-    return Command(cmd)
-  
-  @overload
-  @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str)->Command:pass
-  @overload
-  @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
-  @overload
-  @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
-  @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
-    """
-    colorcode:
-      "#000000"
-    """
-    return MC.Particle(id,pos,int(colorcode[1:3])/100,int(colorcode[3:5])/100,int(colorcode[5:7])/100,1,0,mode,entity) #type:ignore
 
 
 
@@ -1742,13 +1771,13 @@ class IEntitySelector:
     return self.As() + OhMyDat.Please()
 
   def TagAdd(self,id:str):
-    return MC.Tag.Add(self,id)
+    return Command.Tag.Add(self,id)
 
   def TagRemove(self,id:str):
-    return MC.Tag.Remove(self,id)
+    return Command.Tag.Remove(self,id)
 
   def TagList(self):
-    return MC.Tag.List(self)
+    return Command.Tag.List(self)
   
   def merge(self:S,other:S):
     result = self.__class__()
@@ -1924,22 +1953,22 @@ class Scoreboard:
     return Command(f'scoreboard players operation {self.expression()} {operator} {other.expression()}')
   
   def StoreResult(self):
-    return MC.StoreResultScore(self)
+    return Execute.StoreResultScore(self)
   
   def StoreSuccess(self):
-    return MC.StoreSuccessScore(self)
+    return Execute.StoreSuccessScore(self)
 
   def IfMatch(self,start:int,stop:int|None=None):
-    return MC.IfScoreMatch(self,start,stop)
+    return Execute.IfScoreMatch(self,start,stop)
 
   def UnlessMatch(self,start:int,stop:int|None=None):
-    return MC.UnlessScoreMatch(self,start,stop)
+    return Execute.UnlessScoreMatch(self,start,stop)
 
   def If(self,target:Scoreboard,operator:Literal['<', '<=', '=', '>=', '>']):
-    return MC.IfScore(self,target,operator)
+    return Execute.IfScore(self,target,operator)
 
   def Unless(self,target:Scoreboard,operator:Literal['<', '<=', '=', '>=', '>']):
-    return MC.UnlessScore(self,target,operator)
+    return Execute.UnlessScore(self,target,operator)
 
   def jsontext(self) -> jsontextvalue:
     assert self.entity is not None
@@ -1970,7 +1999,7 @@ class Item:
   def Give(self,count:int):
     if self.isTag:
       raise ValueError(f'cannot set blocktag: {self.expression()}')
-    return MC.Give(self,count)
+    return Command.Give(self,count)
 
   def expression(self):
     result = self.id
@@ -2015,10 +2044,10 @@ class Block:
   def SetBlock(self,pos:IPosition):
     if self.isTag:
       raise ValueError(f'cannot set blocktag: {self.expression()}')
-    return MC.SetBlock(self,pos)
+    return Command.SetBlock(self,pos)
 
   def IfBlock(self,pos:IPosition):
-    return MC.IfBlock(pos,self)
+    return Execute.IfBlock(pos,self)
 
   def expression(self):
     result = self.id

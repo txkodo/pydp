@@ -1,7 +1,7 @@
 from pathlib import Path
 import shutil
 import subprocess
-from datapack.datapack import FunctionTag, IDatapackLibrary, MC
+from datapack import Command, FunctionTag, IDatapackLibrary
 
 class ItemFrameHook(IDatapackLibrary):
   @classmethod
@@ -25,9 +25,9 @@ class ItemFrameHook(IDatapackLibrary):
     if o:name.append('out')
     if r:name.append('rot')
     if name:
-      return MC.CallFunc('ifh:api/'+'_'.join(name))
+      return Command.CallFunc('ifh:api/'+'_'.join(name))
     else:
-      return MC.CallFunc('ifh:api/none')
+      return Command.CallFunc('ifh:api/none')
 
   OnOut = FunctionTag('ifh','on_out')
   OnIn  = FunctionTag('ifh','on_in')
