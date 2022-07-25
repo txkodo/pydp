@@ -401,6 +401,14 @@ class FunctionTag:
     self.export_if_empty = export_if_empty
     self.functions:list[Function] = []
 
+  @property
+  def expression(self) -> str:
+    return f"#{self.namespace}:{self.name}"
+
+  @property
+  def expression_without_hash(self) -> str:
+    return f"{self.namespace}:{self.name}"
+
   def append(self,function:Function):
     function.tagged = True
     self.functions.append(function)
@@ -409,6 +417,7 @@ class FunctionTag:
     """呼び出し先のファンクションにタグから呼ばれることを伝える"""
     for f in self.functions:
       f.tagged = True
+      f.within.add(self)
 
   def export(self,path:Path) -> None:
     path = path/f"data/{self.namespace}/tags/functions/{self.name}.json"
@@ -520,12 +529,38 @@ class _DatapackMeta(type):
   @description.setter
   def description(cls,value:None|str):
     cls._description = value
+  
+  export_imp_doc = True
+
+class FunctionAccessModifier(Enum):
+  WITHIN = "within"
+  PRIVATE = "private"
+  INTERNAL = "internal"
+  PUBLIC = "public"
+  API = "api"
 
 class Datapack(metaclass=_DatapackMeta):
+  """
+  データパック出力時の設定
+
+  attrs
+  ---
+  default_namespace:
+    匿名ファンクションの出力先の名前空間
+
+  default_folder:
+    匿名ファンクションの出力先のディレクトリ階層
+
+  description:
+    データパックの説明 (pack.mcmetaのdescriptionの内容)
+
+  export_imp_doc:
+    [IMP-Doc](https://github.com/ChenCMD/datapack-helper-plus-JP/wiki/IMP-Doc) を出力するか否か
+  """
   created_paths:list[Path] = []
 
   @staticmethod
-  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None,description:str|None=None):
+  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None,description:str|None=None,export_imp_doc:bool|None=None):
     """
     データパックを指定パスに出力する
 
@@ -548,6 +583,9 @@ class Datapack(metaclass=_DatapackMeta):
     
     description: str|None = None
       データパックのpack.mcmetaのdescriptionの内容
+
+    export_imp_doc:
+      [IMP-Doc](https://github.com/ChenCMD/datapack-helper-plus-JP/wiki/IMP-Doc) を出力するか否か
     """
 
     path = Path(path)
@@ -555,6 +593,7 @@ class Datapack(metaclass=_DatapackMeta):
     if default_namespace is not None: Datapack.default_namespace = default_namespace
     if default_folder is not None: Datapack.default_folder = default_folder
     if description is not None: Datapack.description = description
+    if export_imp_doc is not None: Datapack.export_imp_doc = export_imp_doc
 
     for library in IDatapackLibrary.__subclasses__():
       if library.using:
@@ -626,6 +665,13 @@ class _FuncState(Enum):
   EXPORT = auto()
 
 class Function:
+  """
+  default_access_modifier: FunctionAccessModifier = FunctionAccessModifier.API
+
+    名前付きファンクションのデフォルトのアクセス修飾子
+
+    Datapack.export_imp_doc == True の場合のみ有効
+  """
   functions:list[Function] = []
 
   @classmethod
@@ -634,8 +680,15 @@ class Function:
     return _gen_id(upper=False,length=24)
 
   callstate:_FuncState
+  default_access_modifier:FunctionAccessModifier = FunctionAccessModifier.API
 
-  def __init__(self,namespace:str|None=None,name:str|None=None,commands:None|list[Command]=None) -> None:
+  @overload
+  def __init__(self,namespace:str,name:str,access_modifier:FunctionAccessModifier|None=None,description:str|None=None,*_,commands:None|list[Command]=None) -> None:pass
+  @overload
+  def __init__(self,namespace:str,name:str,*_,commands:None|list[Command]=None) -> None:pass
+  @overload
+  def __init__(self,*_,commands:None|list[Command]=None) -> None:pass
+  def __init__(self,namespace:str|None=None,name:str|None=None,access_modifier:FunctionAccessModifier|None=None,description:str|None=None,*_,commands:None|list[Command]=None) -> None:
     """
     mcfunctionをあらわすクラス
 
@@ -663,6 +716,20 @@ class Function:
       省略するとデフォルトのフォルダ内の`{自動生成id}.mcfunction`となる (Function.exportAll()の引数で設定可能) 
 
       例: `""` `"myfync"` `"dir/myfunc"` `"dir/subdir/"`
+    
+    access_modifier: Optional[FunctionAccessModifier]
+      [IMP-Doc](https://github.com/ChenCMD/datapack-helper-plus-JP/wiki/IMP-Doc)のファンクションアクセス修飾子を指定
+
+      Datapack.export_imp_doc == False の場合機能しない
+
+      デフォルト: 匿名ファンクションの場合 WITHIN, 名前付きの場合 API
+    
+    description: Optional[str]
+      functionの説明文 複数行可能
+
+      [IMP-Doc](https://github.com/ChenCMD/datapack-helper-plus-JP/wiki/IMP-Doc)に記載する
+
+      Datapack.export_imp_doc == False の場合機能しない
 
     commands: list[Command] = []
       コマンドのリスト
@@ -701,8 +768,20 @@ class Function:
     self.subcommanded = False
     self.used = False
     self.visited = False
+
+    self.description = description
+
     self.calls:set[Function] = set()
+
+    self.within:set[Function|FunctionTag] = set()
   
+    if access_modifier is None:
+      if self._hasname:
+        access_modifier = Function.default_access_modifier
+      else:
+        access_modifier = FunctionAccessModifier.WITHIN
+    self.access_modifier = access_modifier
+
   @property
   def namespace(self) -> str:
     if self._namespace is None:
@@ -761,6 +840,7 @@ class Function:
           cmd.holder.subcommanded = True
         cmd.holder.used = True
         self.calls.add(cmd.holder)
+        cmd.holder.within.add(self)
 
   def define_state(self) -> None:
     """関数を埋め込むか書き出すか決定する"""
@@ -836,7 +916,32 @@ class Function:
     Datapack.created_paths.extend(reversed(paths))
 
     path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text("\n".join(commands),encoding='utf8')
+
+    if Datapack.export_imp_doc:
+      commands.insert(0,self._imp_doc())
+
+    result = "\n".join(commands)
+
+    path.write_text(result,encoding='utf8')
+
+  def _imp_doc(self):
+    description = ''
+    if self.description:
+      description = '\n' + '\n# \n'.join( f"# {x}" for x in self.description.split('\n'))
+
+    withinstr = ''
+    if self.access_modifier is FunctionAccessModifier.WITHIN:
+      withins:list[str] = []
+      for file in self.within:
+        match file:
+          case Function():
+            withins.append(f'function {file.expression}')
+          case FunctionTag():
+            withins.append(f'tag/function {file.expression_without_hash}')
+      withinstr = '\n' + '\n'.join(f'#   {x}' for x in withins)
+
+    return f"""#> {self.expression}{description}
+# @{self.access_modifier.value}""" + withinstr
 
   def export(self,path:Path) -> None:
     if self.callstate is _FuncState.EXPORT:
