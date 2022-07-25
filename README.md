@@ -91,7 +91,7 @@ func = Function('minecraft','test')
 execute = Execute.In('minecraft:nether').Align('xyz').Run(Command.Say('hello world'))
 execute = Execute.In('minecraft:nether') + Execute.Align('xyz') + Command.Say('hello world')
 
-execute.export() # -> execute in minecraft:nether align xyz run say hello world
+print(execute.export()) # -> execute in minecraft:nether align xyz run say hello world
 
 func += execute
 
