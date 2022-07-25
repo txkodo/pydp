@@ -482,7 +482,7 @@ class IDatapackLibrary:
     raise NotImplementedError
 
 class _DatapackMeta(type):
-  _default_namespace:str = '_'
+  _default_namespace:str = 'pydp'
 
   @property
   def default_namespace(cls):
