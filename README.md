@@ -2,7 +2,7 @@
 
 pythonによるデータパック生成ツール
 
-詳しくは[Wiki](/wiki)参照
+詳しくは[Wiki](https://github.com/txkodo/pydp/wiki)参照
 
 ### 動作バージョン
 
