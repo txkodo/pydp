@@ -481,7 +481,7 @@ class IDatapackLibrary:
     """
     raise NotImplementedError
 
-class DatapackMeta(type):
+class _DatapackMeta(type):
   _default_namespace:str = '_'
 
   @property
@@ -495,7 +495,7 @@ class DatapackMeta(type):
     cls._default_namespace = value
 
   _default_folder:str = ''
-
+ 
   @property
   def default_folder(cls):
     return cls._default_folder
@@ -506,7 +506,7 @@ class DatapackMeta(type):
       raise ValueError(fr'default_folder argument must match /([0-9a-z_\.-]+/)*/ not "{value}"')
     cls._default_folder = value
 
-class Datapack(metaclass=DatapackMeta):
+class Datapack(metaclass=_DatapackMeta):
   created_paths:list[Path] = []
 
   @staticmethod
