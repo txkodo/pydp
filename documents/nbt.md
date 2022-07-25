@@ -39,6 +39,10 @@ i2.isMatch(Int(100)) + Command.Say("foo:bar I2 is 100.")
 # >>> execute unless data storage foo:bar {I2:100} run say foo:bar I2 is not 100.
 i2.notMatch(Int(100)) + Command.Say("foo:bar I2 is not 100.")
 
+# storage foo:bar {自動生成id} (Short型)
+# 自動生成idの例: ":FgE9vZym"
+s1 = storage[Short]
+
 # storage foo:bar C1 (Compound型)
 c1 = storage['C1',Compound]
 c1 = storage['C1'] # 上と等価
