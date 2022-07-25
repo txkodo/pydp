@@ -42,28 +42,28 @@ Datapack.export(path)
 say hello world
 ```
 
-# コマンドを使う
+### コマンドを使う
 [コマンドを使う](/documents/command.md)
 
-# executeを使う
+### executeを使う
 [executeを使う](/documents/execute.md)
 
-# nbtを使う
+### nbtを使う
 [nbtを使う](/documents/nbt.md)
 
-# ファンクションを使う
+### ファンクションを使う
 [ファンクションを使う](/documents/function.md)
 
-# Block
+### Block
 
-# Item
+### Item
 
-# Position
+### Position
 
-# EntitySelector
+### EntitySelector
 
-# ScoreBoard
+### ScoreBoard
 
-# JsonText
+### JsonText
 
-# データパックライブラリの定義
+### データパックライブラリの定義
