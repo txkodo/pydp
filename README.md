@@ -52,17 +52,21 @@ say hello world
 
 `Function += Command`とすることでファンクションにコマンドを追加できる
 
+コマンドは`export()`メソッドを使うことで文字列化できる
+
 ```python
 from datapack import Command, Function
 
 func = Function('minecraft','test')
 
 # 組み込み済みのコマンド
-command = Command.Say("hello world")
+command = Command.Say("hello world1")
+command.export() # -> say hello world1
 func += command
 
 # コマンドの自己定義
-command = Command("say hello world")
+command = Command("say hello world2")
+command.export() # -> say hello world2
 func += command
 
 ```
@@ -76,14 +80,21 @@ func += command
 サブコマンド単体ではコマンドとしては使用できないが、
 ConditionSubCommandクラス(execute if/unless のためのクラス)のみ単体でコマンドとして使用できる
 
+サブコマンドと結合したコマンドも`export()`メソッドを使うことで文字列化できる
+
 ```python
 from datapack import Command, Execute, Function
 
 func = Function('minecraft','test')
 
 # 下の二つは等価
-func += Execute.In('minecraft:nether').Align('xyz').Run(Command.Say('hello world'))
-func += Execute.In('minecraft:nether') + Execute.Align('xyz') + Command.Say('hello world')
+execute = Execute.In('minecraft:nether').Align('xyz').Run(Command.Say('hello world'))
+execute = Execute.In('minecraft:nether') + Execute.Align('xyz') + Command.Say('hello world')
+
+execute.export() # -> execute in minecraft:nether align xyz run say hello world
+
+func += execute
+
 ```
 
 # nbtを使う
@@ -91,9 +102,7 @@ func += Execute.In('minecraft:nether') + Execute.Align('xyz') + Command.Say('hel
 以下nbtの型定義とnbt関連のコマンド生成の例
 
 ```python
-from datapack import Byte, Command, Compound, Function, Int, List, StorageNbt
-
-func = Function('minecraft','test')
+from datapack import Byte, Command, Compound, Int, List, StorageNbt
 
 # ストレージを定義
 storage = StorageNbt('foo:bar')
@@ -106,23 +115,27 @@ i1 = storage['I1',Int]
 int_value = Int(100)
 
 # I1を100(Int型)にする
-func += i1.set(int_value)
-# >>> data modify storage foo:bar I1 set value 100
+i1.set(int_value).export()
+# -> data modify storage foo:bar I1 set value 100
 
 # storage foo:bar I2 をInt型として定義
 i2 = storage['I1',Int]
 
 # I2をI1にする
-func += i2.set(i1)
+# >>> data modify storage foo:bar I2 set from storage foo:bar I1
+i2.set(i1)
 
 # say hello world の結果を1倍してI2に(Int型として)格納する
-func += i2.storeResult(1) + Command.Say('hello world')
+# >>> execute store result storage foo:bar I2 int 1 run say hello world
+i2.storeResult(1) + Command.Say('hello world')
 
 # I2が100なら...
-func += i2.isMatch(Int(100)) + Command.Say("foo:bar I2 is 100.")
+# >>> execute if data storage foo:bar {I2:100} run say foo:bar I2 is 100.
+i2.isMatch(Int(100)) + Command.Say("foo:bar I2 is 100.")
 
 # I2が100でないなら...
-func += i2.notMatch(Int(100)) + Command.Say("foo:bar I2 is not 100.")
+# >>> execute unless data storage foo:bar {I2:100} run say foo:bar I2 is not 100.
+i2.notMatch(Int(100)) + Command.Say("foo:bar I2 is not 100.")
 
 # storage foo:bar C1 (Compound型)
 c1 = storage['C1',Compound]
