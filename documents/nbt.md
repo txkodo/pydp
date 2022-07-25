@@ -43,6 +43,11 @@ i2.notMatch(Int(100)) + Command.Say("foo:bar I2 is not 100.")
 c1 = storage['C1',Compound]
 c1 = storage['C1'] # 上と等価
 
+# storage foo:bar {自動生成id} (Compound型)
+# 自動生成idの例: ":FgE9vZym"
+c2 = storage[Compound] 
+
+
 # storage foo:bar C1.I3 (Int型)
 i3 = c1['I3',Int]
 
@@ -56,10 +61,10 @@ i4 = l1[0]
 l2 = storage['L2',List[Compound]]
 
 # storage foo:bar L2[] (Compound型)
-c2 = l2.all()
+c3 = l2.all()
 
 # storage foo:bar L2[{a:1b}] (Compound型)
-c3 = l2.filterAll(Compound({'a':Byte(1)}))
+c4 = l2.filterAll(Compound({'a':Byte(1)}))
 ```
 
 [目次](../README.md)
