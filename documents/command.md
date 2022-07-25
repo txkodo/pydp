@@ -27,3 +27,7 @@ print(command.export()) # -> say hello world2
 func += command
 
 ```
+
+[目次](../README.md)
+
+[executeを使う](/execute.md)
