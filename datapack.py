@@ -51,6 +51,80 @@ def _gen_id(length:int=8,prefix:str='',suffix:str='',upper:bool=True,lower:bool=
 
 
 
+class Position:
+  class IPosition(metaclass=ABCMeta):
+    prefix:str
+    x:float
+    y:float
+    z:float
+    def __init__(self,x:float,y:float,z:float) -> None:
+      self.x = x
+      self.y = y
+      self.z = z
+
+    def __str__(self):
+      return self.expression()
+
+    @classmethod
+    def origin(cls):
+      return cls(0,0,0)
+    
+    def tuple(self):
+      return (self.x,self.y,self.z)
+
+    def expression(self):
+      def expr(value:float):
+        v = "" if self.prefix and value == 0 else str(value)
+        return self.prefix + v
+      return f'{expr(self.x)} {expr(self.y)} {expr(self.z)}'
+
+    def Positioned(self):
+      return SubCommand(f"positioned {self.expression()}")
+
+    def IfBlock(self,block:Block):
+      return ConditionSubCommand(f"if block {self.expression()} {block.expression()}")
+
+    def UnlessBlock(self,block:Block):
+      return ConditionSubCommand(f"unless block {self.expression()} {block.expression()}")
+    
+    def Facing(self):
+      return SubCommand(f"facing {self.expression()}")
+
+    def Nbt(self):
+      return BlockNbt(self)
+    
+    def __add__(self,diff:tuple[float,float,float]):
+      return self.__class__(self.x+diff[0],self.y+diff[1],self.z+diff[2])
+
+    def __iadd__(self,diff:tuple[float,float,float]):
+      self.x+=diff[0]
+      self.y+=diff[1]
+      self.z+=diff[2]
+      return self
+
+    def __sub__(self,diff:tuple[float,float,float]):
+      return self.__class__(self.x-diff[0],self.y-diff[1],self.z-diff[2])
+
+    def __isub__(self,diff:tuple[float,float,float]):
+      self.x-=diff[0]
+      self.y-=diff[1]
+      self.z-=diff[2]
+      return self
+
+    def __neg__(self):
+      return self.__class__(-self.x,-self.y,-self.z)
+
+  class Local(IPosition):
+    """^x ^y ^z"""
+    prefix = "^"
+
+  class World(IPosition):
+    """x y z"""
+    prefix = ""
+
+  class Relative(IPosition):
+    """~x ~y ~z"""
+    prefix = "~"
 
 
 
@@ -1633,81 +1707,6 @@ class EntityNbt:
 
 
 
-
-class Position:
-  class IPosition(metaclass=ABCMeta):
-    prefix:str
-    x:float
-    y:float
-    z:float
-    def __init__(self,x:float,y:float,z:float) -> None:
-      self.x = x
-      self.y = y
-      self.z = z
-
-    def __str__(self):
-      return self.expression()
-
-    @classmethod
-    def origin(cls):
-      return cls(0,0,0)
-    
-    def tuple(self):
-      return (self.x,self.y,self.z)
-
-    def expression(self):
-      def expr(value:float):
-        v = "" if self.prefix and value == 0 else str(value)
-        return self.prefix + v
-      return f'{expr(self.x)} {expr(self.y)} {expr(self.z)}'
-
-    def Positioned(self):
-      return SubCommand(f"positioned {self.expression()}")
-
-    def IfBlock(self,block:Block):
-      return ConditionSubCommand(f"if block {self.expression()} {block.expression()}")
-
-    def UnlessBlock(self,block:Block):
-      return ConditionSubCommand(f"unless block {self.expression()} {block.expression()}")
-    
-    def Facing(self):
-      return SubCommand(f"facing {self.expression()}")
-
-    def Nbt(self):
-      return BlockNbt(self)
-    
-    def __add__(self,diff:tuple[float,float,float]):
-      return self.__class__(self.x+diff[0],self.y+diff[1],self.z+diff[2])
-
-    def __iadd__(self,diff:tuple[float,float,float]):
-      self.x+=diff[0]
-      self.y+=diff[1]
-      self.z+=diff[2]
-      return self
-
-    def __sub__(self,diff:tuple[float,float,float]):
-      return self.__class__(self.x-diff[0],self.y-diff[1],self.z-diff[2])
-
-    def __isub__(self,diff:tuple[float,float,float]):
-      self.x-=diff[0]
-      self.y-=diff[1]
-      self.z-=diff[2]
-      return self
-
-    def __neg__(self):
-      return self.__class__(-self.x,-self.y,-self.z)
-
-  class Local(IPosition):
-    """^x ^y ^z"""
-    prefix = "^"
-
-  class World(IPosition):
-    """x y z"""
-    prefix = ""
-
-  class Relative(IPosition):
-    """~x ~y ~z"""
-    prefix = "~"
 
 
 
