@@ -1015,7 +1015,7 @@ class NbtPath:
       """
       パスをdictの内容で絞るためのパス
       """
-    
+
     @final
     def str(self)->str:
       return f"{self.typestr} {self.holderstr} {self.pathstr}"
@@ -1042,7 +1042,12 @@ class NbtPath:
 
     @property
     @abstractmethod
-    def pathstr(self) -> str:pass
+    def pathstr(self) -> str:
+      """
+      nbtパスの文字列
+
+      a / a.a / a[0] ...
+      """
 
   class Root(INbtPath):
     """stoarge a:b {}"""
@@ -1096,7 +1101,10 @@ class NbtPath:
       return self._holder
 
   class Child(INbtPath):
-    """stoarge a:b foo.bar"""
+    """
+    stoarge a:b foo
+    stoarge a:b foo.bar
+    """
     def __init__(self, parent: NbtPath.INbtPath,child:str) -> None:
       super().__init__(parent)
       self._value = child
@@ -1106,6 +1114,21 @@ class NbtPath:
 
     def filter(self,value:Value[Compound]) -> NbtPath.INbtPath:
       return NbtPath.ChildMatch(self._parent,self._value,value)
+
+    _escape_re = re.compile(r'[\[\]\{\}"\.]')
+
+    @staticmethod
+    def _escape(value:str):
+      """
+      nbtパスのエスケープ処理
+
+      []{}." がある場合ダブルクオートで囲う必要がある
+      
+      ダブルクオート内では"と\\をエスケープする
+      """
+      if NbtPath.Child._escape_re.match(value):
+        return '"' + value.replace('\\','\\\\').replace('"','\\"') + '"'
+      return value
 
     @property
     def pathstr(self)->str:
@@ -1251,6 +1274,14 @@ class Value(Generic[CO_NBT]):
   @staticmethod
   def isCompound(value:Value[INbt]) -> TypeGuard[Value[Compound]]:
     return value._type is Compound
+
+  @property 
+  def compound(self:Value[Compound]):
+    return self._compound
+
+  @compound.setter
+  def compound(self:Value[Compound],value:dict[str, Value[INbt]]):
+    self._compound = value
 
 NUMBER = TypeVar('NUMBER',bound=Union[int,float])
 
@@ -1401,8 +1432,20 @@ class Compound(INbt):
       return super().__new__(cls,value,type)
     else:
       result = Value(cls,f"{{{','.join( f'{k}:{v.str()}' for k,v in value.items())}}}")
-      result._compound = value #type:ignore
+      result.compound = value
       return result
+  
+  _escape_re = re.compile(r'[0-9a-zA-Z_\.-]+')
+  @staticmethod
+  def _escape_key(value:str):
+    if value == "":
+      raise ValueError('empty string is not allowed for Compound key')
+    if Compound._escape_re.fullmatch(value):
+      return value
+    if '"' in value:
+      return "'" + value.replace('\\','\\\\').replace("'","\\'") + "'"
+    return '"' + value.replace('\\','\\\\').replace('"','\\"') + '"'
+
 
   @overload
   def __getitem__(self,value:str) -> Compound:pass
@@ -1418,7 +1461,7 @@ class Compound(INbt):
       case (name,r):
         return r(NbtPath.Child(self._path,name),r)
       case _:
-        return value(NbtPath.Child(self._path,_gen_id(prefix='_')),value)
+        return value(NbtPath.Child(self._path,_gen_id(prefix=':')),value)
 
   def childMatch(self,child:str,match:Value[Compound]):
     """条件付き子要素 self.child{foo:bar}"""
@@ -1428,8 +1471,8 @@ class Compound(INbt):
 
   @staticmethod
   def mergeValue(v1:Value[Compound],v2:Value[Compound]):
-    value1:dict[str,Value[INbt]] = v1._compound #type:ignore
-    value2:dict[str,Value[INbt]] = v2._compound #type:ignore
+    value1:dict[str,Value[INbt]] = v1.compound
+    value2:dict[str,Value[INbt]] = v2.compound
     result = {**value1}
     for k,v in value2.items():
       if Value.isCompound(v) and k in value1:
@@ -1440,8 +1483,8 @@ class Compound(INbt):
           result[k] = v
       else:
         result[k] = v
-    r = Value[Compound](Compound,f"{{{','.join( f'{k}:{v.str()}' for k,v in result.items())}}}")
-    r._compound = result #type:ignore
+    r = Value[Compound](Compound,f"{{{','.join( f'{Compound._escape_key(k)}:{v.str()}' for k,v in result.items())}}}")
+    r.compound = result
     return r
 
 COMPOUNDVALUE = TypeVar('COMPOUNDVALUE',bound=Value[Compound])
