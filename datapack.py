@@ -391,6 +391,8 @@ class _ScheduleClearCommand(Command):
     return f'schedule clear {self.holder.expression}'
 
 class FunctionTag:
+  tick:FunctionTag
+  load:FunctionTag
   functiontags:list[FunctionTag] = []
   def __init__(self,namespace:str,name:str) -> None:
     FunctionTag.functiontags.append(self)
@@ -425,6 +427,8 @@ class FunctionTag:
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps({"values":values}),encoding='utf8')
 
+FunctionTag.tick = FunctionTag('minecraft','tick')
+FunctionTag.load = FunctionTag('minecraft','load')
 
 class IDatapackLibrary:
   """
