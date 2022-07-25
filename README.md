@@ -2,6 +2,8 @@
 
 pythonによるデータパック生成ツール
 
+詳しくは[Wiki](/wiki)参照
+
 ### 動作バージョン
 
 python 3.10+
@@ -42,28 +44,3 @@ Datapack.export(path)
 say hello world
 ```
 
-### コマンドを使う
-[コマンドを使う](/documents/command.md)
-
-### executeを使う
-[executeを使う](/documents/execute.md)
-
-### nbtを使う
-[nbtを使う](/documents/nbt.md)
-
-### ファンクションを使う
-[ファンクションを使う](/documents/function.md)
-
-### Block
-
-### Item
-
-### Position
-
-### EntitySelector
-
-### ScoreBoard
-
-### JsonText
-
-### データパックライブラリの定義
