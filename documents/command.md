@@ -30,4 +30,4 @@ func += command
 
 [目次](../README.md)
 
-[executeを使う](/execute.md)
+[executeを使う](./execute.md)

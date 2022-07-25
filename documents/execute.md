@@ -27,4 +27,4 @@ func += execute
 
 [目次](../README.md)
 
-[nbtを使う](/nbt.md)
+[nbtを使う](./nbt.md)

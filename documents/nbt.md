@@ -64,4 +64,4 @@ c3 = l2.filterAll(Compound({'a':Byte(1)}))
 
 [目次](../README.md)
 
-[ファンクションを使う](/function.md)
+[ファンクションを使う](./function.md)

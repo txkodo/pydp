@@ -71,4 +71,4 @@ say this is anonymous
 
 [目次](../README.md)
 
-[ブロックを使う](/block.md)
+[ブロックを使う](./block.md)
