@@ -564,7 +564,7 @@ class Datapack(metaclass=_DatapackMeta):
       mcmeta.write_text("""{
   "pack":{
     "pack_format":9,
-    "description":"mccore auto generated pack"
+    "description":"pydp auto generated datapack"
   }
 }""")
 
@@ -1245,13 +1245,13 @@ class INbt:
   def _storeSuccess(self,type: Literal['byte', 'short', 'int', 'long', 'float', 'double'],scale:float) -> SubCommand:
     return self._path.store('success',type,scale)
 
-  def isMatch(self,value:Value[NBT]) -> ConditionSubCommand:
+  def isMatch(self,value:Value[Self]) -> ConditionSubCommand:
     return ConditionSubCommand(f'if data {self._path.match(value).str()}')
 
-  def notMatch(self,value:Value[NBT]) -> ConditionSubCommand:
+  def notMatch(self,value:Value[Self]) -> ConditionSubCommand:
     return ConditionSubCommand(f'unless data {self._path.match(value).str()}')
 
-  def set(self,value:Value[NBT]|Self) -> Command:
+  def set(self,value:Value[Self]|Self) -> Command:
     if isinstance(value,Value):
       return Command(f"data modify {self.path} set value {value.str()}")
     else:
