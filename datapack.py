@@ -394,10 +394,11 @@ class FunctionTag:
   tick:FunctionTag
   load:FunctionTag
   functiontags:list[FunctionTag] = []
-  def __init__(self,namespace:str,name:str) -> None:
+  def __init__(self,namespace:str,name:str,export_if_empty:bool=True) -> None:
     FunctionTag.functiontags.append(self)
     self.namespace = namespace
     self.name = name
+    self.export_if_empty = export_if_empty
     self.functions:list[Function] = []
 
   def append(self,function:Function):
@@ -418,17 +419,18 @@ class FunctionTag:
         values.append(f.expression)
 
     paths:list[Path] = []
-    _path = path
-    while not _path.exists():
-      paths.append(_path)
-      _path = _path.parent
-    Datapack.created_paths.extend(reversed(paths))
+    if self.export_if_empty or values:
+      _path = path
+      while not _path.exists():
+        paths.append(_path)
+        _path = _path.parent
+      Datapack.created_paths.extend(reversed(paths))
 
-    path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text(json.dumps({"values":values}),encoding='utf8')
+      path.parent.mkdir(parents=True,exist_ok=True)
+      path.write_text(json.dumps({"values":values}),encoding='utf8')
 
-FunctionTag.tick = FunctionTag('minecraft','tick')
-FunctionTag.load = FunctionTag('minecraft','load')
+FunctionTag.tick = FunctionTag('minecraft','tick',False)
+FunctionTag.load = FunctionTag('minecraft','load',False)
 
 class IDatapackLibrary:
   """
