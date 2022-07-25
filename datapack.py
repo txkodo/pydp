@@ -505,12 +505,21 @@ class _DatapackMeta(type):
     if not re.fullmatch(r'([0-9a-z_\.-]+/)*',value):
       raise ValueError(fr'default_folder argument must match /([0-9a-z_\.-]+/)*/ not "{value}"')
     cls._default_folder = value
+  
+  _description:str|None=None
+  @property
+  def description(cls):
+    return cls._description
+
+  @description.setter
+  def description(cls,value:None|str):
+    cls._description = value
 
 class Datapack(metaclass=_DatapackMeta):
   created_paths:list[Path] = []
 
   @staticmethod
-  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None):
+  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None,description:str|None=None):
     """
     データパックを指定パスに出力する
 
@@ -530,12 +539,16 @@ class Datapack(metaclass=_DatapackMeta):
       自動生成されるファンクションの格納先のディレクトリ階層 空文字列の場合は名前空間直下に生成
 
       例 : '', 'foo/', 'foo/bar/'
+    
+    description: str|None = None
+      データパックのpack.mcmetaのdescriptionの内容
     """
 
     path = Path(path)
 
     if default_namespace is not None: Datapack.default_namespace = default_namespace
     if default_folder is not None: Datapack.default_folder = default_folder
+    if description is not None: Datapack.description = description
 
     for library in IDatapackLibrary.__subclasses__():
       if library.using:
@@ -560,13 +573,14 @@ class Datapack(metaclass=_DatapackMeta):
       path.mkdir(parents=True)
 
     mcmeta = path/"pack.mcmeta"
-    if not mcmeta.exists():
-      mcmeta.write_text("""{
-  "pack":{
+    if not mcmeta.exists() or Datapack.description is not None:
+      description = "pydp auto generated datapack" if Datapack.description is None else Datapack.description
+      mcmeta.write_text(f"""{{
+  "pack":{{
     "pack_format":9,
-    "description":"pydp auto generated datapack"
-  }
-}""")
+    "description":{description}
+  }}
+}}""")
 
     for f in FunctionTag.functiontags:
       # 呼び出し構造の解決
