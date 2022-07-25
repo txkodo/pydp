@@ -104,7 +104,7 @@ class SubCommand:
     """ execute at @ """
     return self + Execute.At(entity)
 
-  def Positioned(self,pos:IPosition):
+  def Positioned(self,pos:Position.IPosition):
     """ execute positioned ~ ~ ~ """
     return self + Execute.Positioned(pos)
 
@@ -116,7 +116,7 @@ class SubCommand:
     """ execute align xyz """
     return self + Execute.Align(axes)
     
-  def Facing(self,pos:IPosition):
+  def Facing(self,pos:Position.IPosition):
     """ execute facing ~ ~ ~ """
     return self + Execute.Facing(pos)
 
@@ -140,19 +140,19 @@ class SubCommand:
     """ execute anchored feet|eyes """
     return self + Execute.Anchored(anchor)
 
-  def IfBlock(self,pos:IPosition,block:Block):
+  def IfBlock(self,pos:Position.IPosition,block:Block):
     """ execute if block ~ ~ ~ {block} """
     return self + Execute.IfBlock(pos,block)
 
-  def UnlessBlock(self,pos:IPosition,block:str):
+  def UnlessBlock(self,pos:Position.IPosition,block:str):
     """ execute unless block ~ ~ ~ {block} """
     return self + Execute.UnlessBlock(pos,block)
 
-  def IfBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+  def IfBlocks(self,begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
     """ execute if blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
     return self + Execute.IfBlocks(begin,end,destination,method)
 
-  def UnlessBlocks(self,begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+  def UnlessBlocks(self,begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
     """ execute unless blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
     return self + Execute.UnlessBlocks(begin,end,destination,method)
 
@@ -236,7 +236,7 @@ class Command:
     return Command(f'tellraw {entity.expression()} {json.dumps(v)}')
 
   @staticmethod
-  def Summon(type:str,pos:IPosition,**nbt:Value[INbt]):
+  def Summon(type:str,pos:Position.IPosition,**nbt:Value[INbt]):
     if nbt:
       return Command(f'summon {type} {pos.expression()} {Compound(nbt).str()}')
     return Command(f'summon {type} {pos.expression()}')
@@ -263,13 +263,13 @@ class Command:
     return Command(f'function {function}')
 
   @staticmethod
-  def SetBlock(block:Block,pos:IPosition,mode:Literal['destroy','keep','replace']|None=None):
+  def SetBlock(block:Block,pos:Position.IPosition,mode:Literal['destroy','keep','replace']|None=None):
     if mode:
       return Command(f'setblock {pos.expression()} {block.expression()} {mode}')
     return Command(f'setblock {pos.expression()} {block.expression()}')
   
   @staticmethod
-  def Fill(start:IPosition,end:IPosition,block:Block,mode:Literal['destroy','hollow','keep','outline','replace']|None=None,oldblock:Block|None=None)->Command:
+  def Fill(start:Position.IPosition,end:Position.IPosition,block:Block,mode:Literal['destroy','hollow','keep','outline','replace']|None=None,oldblock:Block|None=None)->Command:
     if mode == 'replace':
       if oldblock is None:
         raise ValueError('fill mode "replace" needs argument "oldblock"')
@@ -280,9 +280,9 @@ class Command:
 
   @staticmethod
   def Clone(
-      start:IPosition,
-      end:IPosition,
-      target:IPosition,
+      start:Position.IPosition,
+      end:Position.IPosition,
+      target:Position.IPosition,
       maskmode:Literal['replace','masked','filtered']|None=None,
       clonemode:Literal['normal','force','move']|None=None,
       filterblock:Block|None=None
@@ -316,15 +316,15 @@ class Command:
   
   @overload
   @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int)->Command:pass
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int)->Command:pass
   @overload
   @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
   @overload
   @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
   @staticmethod
-  def Particle(id:str,pos:IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
     cmd = f'particke {id} {pos.expression()} {dx} {dy} {dz} {speed} {count}'
     if mode:
       cmd += ' '+mode
@@ -334,15 +334,15 @@ class Command:
   
   @overload
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str)->Command:pass
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str)->Command:pass
   @overload
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
   @overload
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
     """
     colorcode:
       "#000000"
@@ -986,7 +986,7 @@ class Execute:
     return entity.At()
 
   @staticmethod
-  def Positioned(pos:IPosition):
+  def Positioned(pos:Position.IPosition):
     return pos.Positioned()
 
   @staticmethod
@@ -998,7 +998,7 @@ class Execute:
     return SubCommand('align '+axes)
 
   @staticmethod
-  def Facing(pos:IPosition):
+  def Facing(pos:Position.IPosition):
     return pos.Facing()
 
   @staticmethod
@@ -1030,19 +1030,19 @@ class Execute:
     return entity.UnlessEntity()
 
   @staticmethod
-  def IfBlock(pos:IPosition,block:Block):
+  def IfBlock(pos:Position.IPosition,block:Block):
     return ConditionSubCommand(f"if block {pos.expression()} {block.expression()}")
 
   @staticmethod
-  def UnlessBlock(pos:IPosition,block:str):
+  def UnlessBlock(pos:Position.IPosition,block:str):
     return pos.UnlessBlock(block)
 
   @staticmethod
-  def IfBlocks(begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+  def IfBlocks(begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
     return SubCommand(f'if blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
 
   @staticmethod
-  def UnlessBlocks(begin:IPosition,end:IPosition,destination:IPosition,method:Literal['all','masked']):
+  def UnlessBlocks(begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
     return SubCommand(f'unless blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
 
   @staticmethod
@@ -1620,7 +1620,7 @@ class StorageNbt:
     return Compound(NbtPath.Root('storage',name),Compound)
 
 class BlockNbt:
-  def __new__(cls,position:IPosition) -> Compound:
+  def __new__(cls,position:Position.IPosition) -> Compound:
     return Compound(NbtPath.Root('block',position.expression()),Compound)
 
 class EntityNbt:
@@ -1634,69 +1634,69 @@ class EntityNbt:
 
 
 
-class IPosition(metaclass=ABCMeta):
-  prefix:str
-  x:float
-  y:float
-  z:float
-  def __init__(self,x:float,y:float,z:float) -> None:
-    self.x = x
-    self.y = y
-    self.z = z
-
-  def __str__(self):
-    return self.expression()
-
-  @classmethod
-  def origin(cls):
-    return cls(0,0,0)
-  
-  def tuple(self):
-    return (self.x,self.y,self.z)
-
-  def expression(self):
-    def expr(value:float):
-      v = "" if self.prefix and value == 0 else str(value)
-      return self.prefix + v
-    return f'{expr(self.x)} {expr(self.y)} {expr(self.z)}'
-
-  def Positioned(self):
-    return SubCommand(f"positioned {self.expression()}")
-
-  def IfBlock(self,block:str):
-    return ConditionSubCommand(f"if block {self.expression()} {block}")
-
-  def UnlessBlock(self,block:str):
-    return ConditionSubCommand(f"unless block {self.expression()} {block}")
-  
-  def Facing(self):
-    return SubCommand(f"facing {self.expression()}")
-
-  def Nbt(self):
-    return BlockNbt(self)
-  
-  def __add__(self,diff:tuple[float,float,float]):
-    return self.__class__(self.x+diff[0],self.y+diff[1],self.z+diff[2])
-
-  def __iadd__(self,diff:tuple[float,float,float]):
-    self.x+=diff[0]
-    self.y+=diff[1]
-    self.z+=diff[2]
-    return self
-
-  def __sub__(self,diff:tuple[float,float,float]):
-    return self.__class__(self.x-diff[0],self.y-diff[1],self.z-diff[2])
-
-  def __isub__(self,diff:tuple[float,float,float]):
-    self.x-=diff[0]
-    self.y-=diff[1]
-    self.z-=diff[2]
-    return self
-
-  def __neg__(self):
-    return self.__class__(-self.x,-self.y,-self.z)
-
 class Position:
+  class IPosition(metaclass=ABCMeta):
+    prefix:str
+    x:float
+    y:float
+    z:float
+    def __init__(self,x:float,y:float,z:float) -> None:
+      self.x = x
+      self.y = y
+      self.z = z
+
+    def __str__(self):
+      return self.expression()
+
+    @classmethod
+    def origin(cls):
+      return cls(0,0,0)
+    
+    def tuple(self):
+      return (self.x,self.y,self.z)
+
+    def expression(self):
+      def expr(value:float):
+        v = "" if self.prefix and value == 0 else str(value)
+        return self.prefix + v
+      return f'{expr(self.x)} {expr(self.y)} {expr(self.z)}'
+
+    def Positioned(self):
+      return SubCommand(f"positioned {self.expression()}")
+
+    def IfBlock(self,block:str):
+      return ConditionSubCommand(f"if block {self.expression()} {block}")
+
+    def UnlessBlock(self,block:str):
+      return ConditionSubCommand(f"unless block {self.expression()} {block}")
+    
+    def Facing(self):
+      return SubCommand(f"facing {self.expression()}")
+
+    def Nbt(self):
+      return BlockNbt(self)
+    
+    def __add__(self,diff:tuple[float,float,float]):
+      return self.__class__(self.x+diff[0],self.y+diff[1],self.z+diff[2])
+
+    def __iadd__(self,diff:tuple[float,float,float]):
+      self.x+=diff[0]
+      self.y+=diff[1]
+      self.z+=diff[2]
+      return self
+
+    def __sub__(self,diff:tuple[float,float,float]):
+      return self.__class__(self.x-diff[0],self.y-diff[1],self.z-diff[2])
+
+    def __isub__(self,diff:tuple[float,float,float]):
+      self.x-=diff[0]
+      self.y-=diff[1]
+      self.z-=diff[2]
+      return self
+
+    def __neg__(self):
+      return self.__class__(-self.x,-self.y,-self.z)
+
   class Local(IPosition):
     """^x ^y ^z"""
     prefix = "^"
@@ -2213,12 +2213,12 @@ class Block:
     self.blockstates = blockstates
     self.nbt = nbt
 
-  def SetBlock(self,pos:IPosition):
+  def SetBlock(self,pos:Position.IPosition):
     if self.isTag:
       raise ValueError(f'cannot set blocktag: {self.expression()}')
     return Command.SetBlock(self,pos)
 
-  def IfBlock(self,pos:IPosition):
+  def IfBlock(self,pos:Position.IPosition):
     return Execute.IfBlock(pos,self)
 
   def expression(self):
