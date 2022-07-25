@@ -144,7 +144,7 @@ class SubCommand:
     """ execute if block ~ ~ ~ {block} """
     return self + Execute.IfBlock(pos,block)
 
-  def UnlessBlock(self,pos:Position.IPosition,block:str):
+  def UnlessBlock(self,pos:Position.IPosition,block:Block):
     """ execute unless block ~ ~ ~ {block} """
     return self + Execute.UnlessBlock(pos,block)
 
@@ -1034,7 +1034,7 @@ class Execute:
     return ConditionSubCommand(f"if block {pos.expression()} {block.expression()}")
 
   @staticmethod
-  def UnlessBlock(pos:Position.IPosition,block:str):
+  def UnlessBlock(pos:Position.IPosition,block:Block):
     return pos.UnlessBlock(block)
 
   @staticmethod
@@ -1664,11 +1664,11 @@ class Position:
     def Positioned(self):
       return SubCommand(f"positioned {self.expression()}")
 
-    def IfBlock(self,block:str):
-      return ConditionSubCommand(f"if block {self.expression()} {block}")
+    def IfBlock(self,block:Block):
+      return ConditionSubCommand(f"if block {self.expression()} {block.expression()}")
 
-    def UnlessBlock(self,block:str):
-      return ConditionSubCommand(f"unless block {self.expression()} {block}")
+    def UnlessBlock(self,block:Block):
+      return ConditionSubCommand(f"unless block {self.expression()} {block.expression()}")
     
     def Facing(self):
       return SubCommand(f"facing {self.expression()}")
