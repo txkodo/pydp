@@ -2208,8 +2208,8 @@ class Block:
     nbt:
       {"Items":List[Compound]\\([])} / ...
     """
-    self.isTag = self.id.startswith('#')
     self.id = id
+    self.isTag = self.id.startswith('#')
     self.blockstates = blockstates
     self.nbt = nbt
 
