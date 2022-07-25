@@ -42,6 +42,31 @@ Datapack.export(path)
 say hello world
 ```
 
+# コマンドを使う
+
+コマンドはCommandクラスを使って生成する。
+
+いくつかのコマンドはCommandクラスのstaticmethodとして定義してある。
+
+使いたいコマンドがstaticmethodにない場合はCommandインスタンスを直接生成する。
+
+`Function += Command`とすることでファンクションにコマンドを追加できる
+
+```python
+from datapack import Command, Function
+
+func = Function('minecraft','test')
+
+# 組み込み済みのコマンド
+command = Command.Say("hello world")
+func += command
+
+# コマンドの自己定義
+command = Command("say hello world")
+func += command
+
+```
+
 # executeを使う
 
 サブコマンドはメソッドチェーンまたは'+'で連結できる
