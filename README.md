@@ -61,12 +61,12 @@ func = Function('minecraft','test')
 
 # 組み込み済みのコマンド
 command = Command.Say("hello world1")
-command.export() # -> say hello world1
+print(command.export()) # -> say hello world1
 func += command
 
 # コマンドの自己定義
 command = Command("say hello world2")
-command.export() # -> say hello world2
+print(command.export()) # -> say hello world2
 func += command
 
 ```
