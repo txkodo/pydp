@@ -1,30 +1,20 @@
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
+from decimal import Decimal
+from typing import Any, Callable, Generic, Literal, Protocol, TypeAlias, TypeGuard, TypeVar, final, get_args, overload, Union, runtime_checkable
+from typing_extensions import Self
 from enum import Enum, auto
-import json
 import os
+import json
 from pathlib import Path
 from random import randint
 import re
 import shutil
-from typing import Any, Callable, Generic, Literal, Protocol, TypeAlias, TypeGuard, TypeVar, final, get_args, overload, Union, runtime_checkable
-from typing_extensions import Self
 import subprocess
 
-
 def _float_to_str(f:float):
-  float_string = repr(f)
-  if 'e' in float_string:  # detect scientific notation
-      digits, exp = float_string.split('e')
-      digits = digits.replace('.', '').replace('-', '')
-      exp = int(exp)
-      zero_padding = '0' * (abs(int(exp)) - 1)  # minus 1 for decimal point in the sci notation
-      sign = '-' if f < 0 else ''
-      if exp > 0:
-          float_string = '{}{}{}.0'.format(sign, digits, zero_padding)
-      else:
-          float_string = '{}0.{}{}'.format(sign, zero_padding, digits)
-  return float_string
+  return format(Decimal.from_float(f),'f')
+
 
 _id_upper  = tuple(map(chr,range(ord('A'),ord('Z')+1)))
 _id_lower  = tuple(map(chr,range(ord('a'),ord('z')+1)))
@@ -288,7 +278,7 @@ class Command:
   def __init__(self,content:str) -> None:
     self.subcommands:list[str] = []
     self.content = content
-  
+
   def export(self) -> str:
     result = self._command
     if self.subcommands:
@@ -314,7 +304,7 @@ class Command:
     if nbt:
       return Command(f'summon {type} {pos.expression()} {Compound(nbt).str()}')
     return Command(f'summon {type} {pos.expression()}')
-  
+
   @staticmethod
   def Kill(selector:IEntitySelector):
     return Command(f'kill {selector.expression()}')
@@ -433,7 +423,7 @@ class ConditionSubCommand(SubCommand,Command):
     return "execute " + " ".join(self.subcommands)
 
 class _FunctionCommand(Command):
-  """ function minecraft command """
+  """ function command """
   def __init__(self,holder:Function) -> None:
     super().__init__('')
     self.holder = holder
@@ -441,6 +431,12 @@ class _FunctionCommand(Command):
   @property
   def _command(self) -> str:
     raise NotImplementedError
+
+class _FunctionTagCommand(Command):
+  """ function tag command """
+  def __init__(self,holder:FunctionTag) -> None:
+    self.holder = holder
+    super().__init__(f'function {holder.expression}')
 
 class _ScheduleCommand(Command):
   """ function minecraft command """
@@ -479,6 +475,9 @@ class FunctionTag:
   def expression(self) -> str:
     return f"#{self.namespace}:{self.name}"
 
+  def call(self) -> Command:
+    return _FunctionTagCommand(self)
+
   @property
   def expression_without_hash(self) -> str:
     return f"{self.namespace}:{self.name}"
@@ -486,7 +485,7 @@ class FunctionTag:
   def append(self,function:Function):
     function.tagged = True
     self.functions.append(function)
-  
+
   def check_call_relation(self):
     """呼び出し先のファンクションにタグから呼ばれることを伝える"""
     for f in self.functions:
@@ -1450,6 +1449,12 @@ class INbt:
   def notMatch(self,value:Value[Self]) -> ConditionSubCommand:
     return ConditionSubCommand(f'unless data {self._path.match(value).str()}')
 
+  def isExists(self) -> ConditionSubCommand:
+    return ConditionSubCommand(f'if data {self._path.str()}')
+
+  def notExists(self) -> ConditionSubCommand:
+    return ConditionSubCommand(f'unless data {self._path.str()}')
+
   def set(self,value:Value[Self]|Self) -> Command:
     if isinstance(value,Value):
       return Command(f"data modify {self.path} set value {value.str()}")
@@ -1463,24 +1468,17 @@ NBT = TypeVar('NBT',bound = INbt)
 CO_NBT = TypeVar('CO_NBT',bound = INbt,covariant=True)
 
 class Value(Generic[CO_NBT]):
-  def __init__(self,type:type[CO_NBT],value:str) -> None:
+  def __init__(self,type:type[CO_NBT],value:Any,tostr:Callable[[Any],str]) -> None:
     self._type = type
-    self._value = value
+    self._tostr = tostr
+    self.value = value
 
   def str(self):
-    return self._value
-  
+    return self._tostr(self.value)
+
   @staticmethod
   def isCompound(value:Value[INbt]) -> TypeGuard[Value[Compound]]:
     return value._type is Compound
-
-  @property 
-  def compound(self:Value[Compound]):
-    return self._compound
-
-  @compound.setter
-  def compound(self:Value[Compound],value:dict[str, Value[INbt]]):
-    self._compound = value
 
 NUMBER = TypeVar('NUMBER',bound=Union[int,float])
 
@@ -1520,9 +1518,14 @@ class INum(INbtGeneric[NUMBER]):
     assert issubclass(cls,INum)
     if value < cls._min or cls._max < value:
       raise ValueError(f'{cls._mode} must be in range {cls._min}..{cls._max}')
+    return Value(cls._cls,value,cls._srtingifier)
+
+  @classmethod
+  def _srtingifier(cls,value:Any):
     if isinstance(value,float):
-      return Value(cls._cls,f'{_float_to_str(value)}{cls._prefixmap[cls._mode]}')
-    return Value(cls._cls,f'{value}{cls._prefixmap[cls._mode]}')
+      return f'{_float_to_str(value)}{cls._prefixmap[cls._mode]}'
+    assert isinstance(value,int)
+    return f'{value}{cls._prefixmap[cls._mode]}'
 
 class Byte(INum[int]):
   _mode = 'byte'
@@ -1556,8 +1559,14 @@ class Double(INum[float]):
 
 class Str(INbtGeneric[str]):
   @classmethod
-  def _str(cls: type[INbtGeneric[str]], value: str) -> Value[INbtGeneric[str]]:
-    return Value(Str,f'"{value}"')
+  def _str(cls, value: str) -> Value[INbtGeneric[str]]:
+    return Value(Str, value, cls._srtingifier)
+  
+  @classmethod
+  def _srtingifier(cls,value:Any):
+    assert isinstance(value,str)
+    value = value.replace('\\', '\\\\').replace('"', '\\"')
+    return f'"{value}"'
 
   def getLength(self,scale:float|None=None) -> Command:return super()._get(scale)
 
@@ -1592,7 +1601,12 @@ class IArray(INbt,Generic[NBT]):
       result._arg = cls._get_arg(type)
       return result
     else:
-      return Value[cls](cls,f"[{cls._prefix}{','.join( v.str() for v in value)}]")
+      return Value[cls](cls,value,cls._stringify)
+
+  @classmethod
+  def _stringify(cls, value: Any):
+    vlu: list[Value[NBT]] = value
+    return f"[{cls._prefix}{','.join(v.str() for v in vlu)}]"
 
 ARRAY = TypeVar('ARRAY',bound=IArray[Any])
 
@@ -1622,18 +1636,21 @@ class IntArray(IArray[Int]):
 
 class Compound(INbt):
   @overload
-  def __new__(cls:type[Compound],value:dict[str,Value[INbt]]) -> Value[Compound]:pass
+  def __new__(cls,value:dict[str,Value[INbt]]) -> Value[Compound]:pass
   @overload
-  def __new__(cls:type[Compound],value:NbtPath.INbtPath,type:type[Compound]) -> Compound:pass
-  def __new__(cls:type[Compound],value:NbtPath.INbtPath|dict[str,Value[INbt]],type:type[Compound]|None=None):
+  def __new__(cls,value:NbtPath.INbtPath,type:type[Compound]) -> Compound:pass
+  def __new__(cls,value:NbtPath.INbtPath|dict[str,Value[INbt]],type:type[Compound]|None=None):
     if isinstance(value,NbtPath.INbtPath):
       assert type is not None
       return super().__new__(cls,value,type)
     else:
-      result = Value(cls,f"{{{','.join( f'{k}:{v.str()}' for k,v in value.items())}}}")
-      result.compound = value
-      return result
-  
+      return Value(cls, value,cls._stringify)
+
+  @classmethod
+  def _stringify(cls, value: Any):
+    vlu: dict[str,Value[INbt]] = value
+    return f"{{{','.join( f'{k}:{v.str()}' for k,v in vlu.items())}}}"
+
   _escape_re = re.compile(r'[0-9a-zA-Z_\.-]+')
   @staticmethod
   def _escape_key(value:str):
@@ -1670,8 +1687,8 @@ class Compound(INbt):
 
   @staticmethod
   def mergeValue(v1:Value[Compound],v2:Value[Compound]):
-    value1:dict[str,Value[INbt]] = v1.compound
-    value2:dict[str,Value[INbt]] = v2.compound
+    value1:dict[str,Value[INbt]] = v1.value
+    value2:dict[str,Value[INbt]] = v2.value
     result = {**value1}
     for k,v in value2.items():
       if Value.isCompound(v) and k in value1:
@@ -1682,9 +1699,7 @@ class Compound(INbt):
           result[k] = v
       else:
         result[k] = v
-    r = Value[Compound](Compound,f"{{{','.join( f'{Compound._escape_key(k)}:{v.str()}' for k,v in result.items())}}}")
-    r.compound = result
-    return r
+    return Compound(result)
 
 COMPOUNDVALUE = TypeVar('COMPOUNDVALUE',bound=Value[Compound])
 COMPOUND = TypeVar('COMPOUND',bound=Compound)
