@@ -15,7 +15,6 @@ import subprocess
 def _float_to_str(f:float):
   return format(Decimal.from_float(f),'f')
 
-
 _id_upper  = tuple(map(chr,range(ord('A'),ord('Z')+1)))
 _id_lower  = tuple(map(chr,range(ord('a'),ord('z')+1)))
 _id_number = tuple(map(chr,range(ord('0'),ord('9')+1)))
@@ -28,6 +27,27 @@ def _gen_id(length:int=8,prefix:str='',suffix:str='',upper:bool=True,lower:bool=
   if number:chars.extend(_id_number)
   maxidx = len(chars) - 1
   return prefix + ''.join(chars[randint(0,maxidx)] for _ in range(length)) + suffix
+
+class Mcpath:
+  def __init__(self,mcpath: str) -> None:
+    namespace, name = mcpath.split(':') if ':' in mcpath else ("", mcpath)
+    if not namespace:
+      namespace = 'minecraft'
+    self._namespace = namespace
+    self._parts = name.split('/')
+
+  @property
+  def namespace(self):
+    return self._namespace
+  
+  @property
+  def parts(self):
+    return self._parts
+
+  @property
+  def name(self):
+    return '/'.join(self._parts)
+
 
 
 
@@ -160,11 +180,11 @@ class SubCommand:
     self.subcommands.extend(other.subcommands)
     return self
 
-  def As(self,entity:IEntitySelector):
+  def As(self,entity:ISelector):
     """ execute as @ """
     return self + Execute.As(entity)
 
-  def At(self,entity:IEntitySelector):
+  def At(self,entity:ISelector):
     """ execute at @ """
     return self + Execute.At(entity)
 
@@ -172,7 +192,7 @@ class SubCommand:
     """ execute positioned ~ ~ ~ """
     return self + Execute.Positioned(pos)
 
-  def PositionedAs(self,entity:IEntitySelector):
+  def PositionedAs(self,entity:ISelector):
     """ execute positioned as @ """
     return self + Execute.PositionedAs(entity)
 
@@ -184,7 +204,7 @@ class SubCommand:
     """ execute facing ~ ~ ~ """
     return self + Execute.Facing(pos)
 
-  def FacingEntity(self,entity:IEntitySelector):
+  def FacingEntity(self,entity:ISelector):
     """ execute facing entity @ """
     return self + Execute.FacingEntity(entity)
 
@@ -192,7 +212,7 @@ class SubCommand:
     """ execute rotated ~ ~ """
     return self + Execute.Rotated(yaw,pitch)
 
-  def RotatedAs(self,target:IEntitySelector):
+  def RotatedAs(self,target:ISelector):
     """ execute rotated as @ """
     return self + Execute.RotatedAs(target)
 
@@ -220,11 +240,11 @@ class SubCommand:
     """ execute unless blocks ~ ~ ~ ~ ~ ~ ~ ~ ~ {method} """
     return self + Execute.UnlessBlocks(begin,end,destination,method)
 
-  def IfEntity(self,entity:IEntitySelector):
+  def IfEntity(self,entity:ISelector):
     """ execute if entity {entity} """
     return self + Execute.IfEntity(entity)
 
-  def UnlessEntity(self,entity:IEntitySelector):
+  def UnlessEntity(self,entity:ISelector):
     """ execute unless entity {entity} """
     return self + Execute.UnlessEntity(entity)
 
@@ -291,11 +311,15 @@ class Command:
     return self.content
 
   @staticmethod
+  def Reload():
+    return Command(f'reload')
+
+  @staticmethod
   def Say(content:str):
     return Command(f'say {content}')
 
   @staticmethod
-  def Tellraw(entity:IEntitySelector,*value:jsontext):
+  def Tellraw(entity:ISelector,*value:jsontext):
     v = "" if len(value) == 0 else evaljsontext(value[0] if len(value) == 1 else list(value))
     return Command(f'tellraw {entity.expression()} {json.dumps(v)}')
 
@@ -306,20 +330,20 @@ class Command:
     return Command(f'summon {type} {pos.expression()}')
 
   @staticmethod
-  def Kill(selector:IEntitySelector):
+  def Kill(selector:ISelector):
     return Command(f'kill {selector.expression()}')
   
   class Tag:
     @staticmethod
-    def List(entity:IEntitySelector):
+    def List(entity:ISelector):
       return Command(f'tag {entity.expression()} list')
 
     @staticmethod
-    def Add(entity:IEntitySelector,tag:str):
+    def Add(entity:ISelector,tag:str):
       return Command(f'tag {entity.expression()} add {tag}')
 
     @staticmethod
-    def Remove(entity:IEntitySelector,tag:str):
+    def Remove(entity:ISelector,tag:str):
       return Command(f'tag {entity.expression()} remove {tag}')
 
   @staticmethod
@@ -370,7 +394,7 @@ class Command:
     return Command(f'give {item.expression()} {count}')
 
   @staticmethod
-  def Clear(entity:IEntitySelector,item:Item|None=None,maxcount:int|None=None):
+  def Clear(entity:ISelector,item:Item|None=None,maxcount:int|None=None):
     cmd = f'clear {entity.expression()}'
     if item:
       cmd += f' {item.expression()}'
@@ -386,9 +410,9 @@ class Command:
   def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'])->Command:pass
   @overload
   @staticmethod
-  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal'],entity:ISelector)->Command:pass
   @staticmethod
-  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+  def Particle(id:str,pos:Position.IPosition,dx:float,dy:float,dz:float,speed:float,count:int,mode:Literal['force','normal']|None=None,entity:ISelector|None=None):
     cmd = f'particke {id} {pos.expression()} {dx} {dy} {dz} {speed} {count}'
     if mode:
       cmd += ' '+mode
@@ -404,9 +428,9 @@ class Command:
   def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal'])->Command:pass
   @overload
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal'],entity:IEntitySelector)->Command:pass
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal'],entity:ISelector)->Command:pass
   @staticmethod
-  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:IEntitySelector|None=None):
+  def ColorParticle(id:Literal['entity_effect','ambient_entity_effect'],pos:Position.IPosition,colorcode:str,mode:Literal['force','normal']|None=None,entity:ISelector|None=None):
     """
     colorcode:
       "#000000"
@@ -523,7 +547,7 @@ class IDatapackLibrary:
   using = True
 
   @classmethod
-  def install(cls,datapack_path:Path) -> None:
+  def install(cls,datapack_path:Path,datapack_id:str) -> None:
     """
     ライブラリを導入
 
@@ -532,9 +556,11 @@ class IDatapackLibrary:
     導入済みでも呼ばれる
 
     datapack_path : saves/{worldname}/datapacks/{datapack}
+
+    datapack_id : 出力データパックのID
     """
     raise NotImplementedError
-  
+
   @staticmethod
   def rmtree(path:Path):
     """ アクセス拒否を解消したshutil.rmtree """
@@ -633,7 +659,14 @@ class Datapack(metaclass=_DatapackMeta):
   created_paths:list[Path] = []
 
   @staticmethod
-  def export(path:str|Path,default_namespace:str|None=None,default_folder:str|None=None,description:str|None=None,export_imp_doc:bool|None=None):
+  def export(
+    path:str|Path,
+    id:str,
+    default_namespace:str|None=None,
+    default_folder:str|None=None,
+    description:str|None=None,
+    export_imp_doc:bool|None=None
+    ):
     """
     データパックを指定パスに出力する
 
@@ -643,6 +676,9 @@ class Datapack(metaclass=_DatapackMeta):
     ---
     path: Path
       データパックのパス ...\\saves\\\\{world_name}\\datapacks\\\\{datapack_name}
+
+    id: Str
+      データパックのID(半角英数)
 
     default_namespace: str = '_'
       自動生成されるファンクションの格納先の名前空間
@@ -668,23 +704,24 @@ class Datapack(metaclass=_DatapackMeta):
     if description is not None: Datapack.description = description
     if export_imp_doc is not None: Datapack.export_imp_doc = export_imp_doc
 
-    for library in IDatapackLibrary.__subclasses__():
-      if library.using:
-        library.install(path)
-      else:
-        library.uninstall(path)
-
-    mccoretxt = (path/"mccore.txt")
-    if mccoretxt.exists():
-      for s in reversed(mccoretxt.read_text().split('\n')):
+    pydptxt = (path/"pydp.txt")
+    if pydptxt.exists():
+      for s in reversed(pydptxt.read_text().split('\n')):
         p = (path / s)
         if not p.exists():
           continue
-
         if p.is_file():
           p.unlink()
         elif p.is_dir() and not any(p.iterdir()):
           p.rmdir()
+
+
+    for library in IDatapackLibrary.__subclasses__():
+      if library.using:
+        library.install(path,id)
+      else:
+        library.uninstall(path)
+
 
     if not path.exists():
       Datapack.created_paths.append(path)
@@ -695,7 +732,7 @@ class Datapack(metaclass=_DatapackMeta):
       description = "pydp auto generated datapack" if Datapack.description is None else Datapack.description
       mcmeta.write_text(f"""{{
   "pack":{{
-    "pack_format":9,
+    "pack_format":10,
     "description":{description}
   }}
 }}""")
@@ -728,7 +765,7 @@ class Datapack(metaclass=_DatapackMeta):
     for p in Datapack.created_paths:
       relpath = p.relative_to(path)
       pathstrs.append(str(relpath))
-    mccoretxt.write_text('\n'.join(pathstrs))
+    pydptxt.write_text('\n'.join(pathstrs))
 
 
 class _FuncState(Enum):
@@ -822,10 +859,10 @@ class Function:
     ```
 
     """
-    
+
     if namespace is not None and not re.fullmatch('[0-9a-z_-]+',namespace):
       raise ValueError(f'namespace argument must match "a" "a0" "a_b-" not "{namespace}"')
-    
+
     if name is not None and not re.fullmatch(r'([0-9a-z_\.-]+/)*([0-9a-z_\.-]+)?',name):
       raise ValueError(f'name argument must like "" "a" "a1/b.1" "a_/b-/" not "{name}"')
 
@@ -854,6 +891,20 @@ class Function:
       else:
         access_modifier = FunctionAccessModifier.WITHIN
     self.access_modifier = access_modifier
+  
+  def set_name(self,namespace:str,name:str):
+    if self._hasname:
+      raise ValueError('cannot reset function name')
+
+    if namespace is not None and not re.fullmatch('[0-9a-z_-]+',namespace):
+      raise ValueError(f'namespace argument must match "a" "a0" "a_b-" not "{namespace}"')
+
+    if name is not None and not re.fullmatch(r'([0-9a-z_\.-]+/)*([0-9a-z_\.-]+)?',name):
+      raise ValueError(f'name argument must like "" "a" "a1/b.1" "a_/b-/" not "{name}"')
+
+    self._namespace = namespace
+    self._name = name
+    self._hasname = True
 
   @property
   def namespace(self) -> str:
@@ -1051,11 +1102,11 @@ class Execute:
   """
 
   @staticmethod
-  def As(entity:IEntitySelector):
+  def As(entity:ISelector):
     return entity.As()
 
   @staticmethod
-  def At(entity:IEntitySelector):
+  def At(entity:ISelector):
     return entity.At()
 
   @staticmethod
@@ -1063,7 +1114,7 @@ class Execute:
     return pos.Positioned()
 
   @staticmethod
-  def PositionedAs(entity:IEntitySelector):
+  def PositionedAs(entity:ISelector):
     return entity.PositionedAs()
 
   @staticmethod
@@ -1075,7 +1126,7 @@ class Execute:
     return pos.Facing()
 
   @staticmethod
-  def FacingEntity(entity:IEntitySelector):
+  def FacingEntity(entity:ISelector):
     return entity.FacingEntity()
 
   @staticmethod
@@ -1083,7 +1134,7 @@ class Execute:
     return SubCommand(f'rotated {_float_to_str(yaw)} {_float_to_str(pitch)}')
 
   @staticmethod
-  def RotatedAs(entity:IEntitySelector):
+  def RotatedAs(entity:ISelector):
     return entity.RotatedAs()
 
   @staticmethod
@@ -1095,11 +1146,11 @@ class Execute:
     return SubCommand(f'anchored {anchor}')
 
   @staticmethod
-  def IfEntity(entity:IEntitySelector):
+  def IfEntity(entity:ISelector):
     return entity.IfEntity()
 
   @staticmethod
-  def UnlessEntity(entity:IEntitySelector):
+  def UnlessEntity(entity:ISelector):
     return entity.UnlessEntity()
 
   @staticmethod
@@ -1112,33 +1163,33 @@ class Execute:
 
   @staticmethod
   def IfBlocks(begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
-    return SubCommand(f'if blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
+    return ConditionSubCommand(f'if blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
 
   @staticmethod
   def UnlessBlocks(begin:Position.IPosition,end:Position.IPosition,destination:Position.IPosition,method:Literal['all','masked']):
-    return SubCommand(f'unless blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
+    return ConditionSubCommand(f'unless blocks {begin.expression()} {end.expression()} {destination.expression()} {method}')
 
   @staticmethod
   def IfScore(target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
-    return SubCommand(f'if score {target.expression()} {operator} {target.expression()}')
+    return ConditionSubCommand(f'if score {target.expression()} {operator} {target.expression()}')
 
   @staticmethod
   def IfScoreMatch(target:Scoreboard,start:int,stop:int|None=None):
     if stop is None:
-      return SubCommand(f'if score {target.expression()} matches {start}')
+      return ConditionSubCommand(f'if score {target.expression()} matches {start}')
     else:
-      return SubCommand(f'if score {target.expression()} matches {start}..{stop}')
+      return ConditionSubCommand(f'if score {target.expression()} matches {start}..{stop}')
 
   @staticmethod
   def UnlessScore(target:Scoreboard,source:Scoreboard,operator:Literal['<','<=','=','>=','>']):
-    return SubCommand(f'if score {target.expression()} {operator} {source.expression()}')
+    return ConditionSubCommand(f'if score {target.expression()} {operator} {source.expression()}')
 
   @staticmethod
   def UnlessScoreMatch(target:Scoreboard,start:int,stop:int|None=None):
     if stop is None:
-      return SubCommand(f'unless score {target.expression()} match {start}')
+      return ConditionSubCommand(f'unless score {target.expression()} match {start}')
     else:
-      return SubCommand(f'unless score {target.expression()} match {start}..{stop}')
+      return ConditionSubCommand(f'unless score {target.expression()} match {start}..{stop}')
 
   @staticmethod
   def StoreResultNbt(nbt:Byte|Short|Int|Long|Float|Double,scale:float=1):
@@ -1713,7 +1764,7 @@ class BlockNbt:
     return Compound(NbtPath.Root('block',position.expression()),Compound)
 
 class EntityNbt:
-  def __new__(cls,selector:IEntitySelector) -> Compound:
+  def __new__(cls,selector:ISelector) -> Compound:
     return Compound(NbtPath.Root('entity',selector.expression()),Compound)
 
 
@@ -1725,7 +1776,7 @@ class EntityNbt:
 
 
 
-class IEntitySelector:
+class ISelector:
   target:str
   def __init__(
       self,
@@ -2000,30 +2051,30 @@ class IEntitySelector:
     return {"selector":self.expression()}
 
 
-S = TypeVar('S',bound=IEntitySelector)
+S = TypeVar('S',bound=ISelector)
 
-class EntitySelector:
-  class S(IEntitySelector):
+class Selector:
+  class S(ISelector):
     """@s[...]"""
     target = "@s"
 
-  class E(IEntitySelector):
+  class E(ISelector):
     """@e[...]"""
     target = "@e"
 
-  class A(IEntitySelector):
+  class A(ISelector):
     """@a[...]"""
     target = "@a"
 
-  class P(IEntitySelector):
+  class P(ISelector):
     """@p[...]"""
     target = "@p"
 
-  class R(IEntitySelector):
+  class R(ISelector):
     """@r[...]"""
     target = "@r"
 
-  class Player(IEntitySelector):
+  class Player(ISelector):
     """
     プレイヤー名を直接使うセレクタ
     txkodo[gamemode=survival]
@@ -2081,7 +2132,7 @@ class Objective:
     """
     return Command(f'scoreboard objectives modify {self.id} {display}')
 
-  def score(self,entity:IEntitySelector|None):
+  def score(self,entity:ISelector|None):
     """
     エンティティのスコアを取得
     """
@@ -2089,7 +2140,7 @@ class Objective:
 
 class Scoreboard:
   @staticmethod
-  def List(entity:IEntitySelector|None):
+  def List(entity:ISelector|None):
     """ 
     エンティティに紐づいたスコアボード一覧を取得
 
@@ -2105,7 +2156,7 @@ class Scoreboard:
       return f'* {self.objective.id}'
     return f'{self.entity.expression()} {self.objective.id}'
 
-  def __init__(self,objective:Objective,entity:IEntitySelector|None) -> None:
+  def __init__(self,objective:Objective,entity:ISelector|None) -> None:
     """ None:すべてのエンティティを対象にする """
     self.objective = objective
     self.entity = entity
@@ -2416,7 +2467,7 @@ class OhMyDat(IDatapackLibrary):
   using = False
 
   @classmethod
-  def install(cls,datapack_path:Path) -> None:
+  def install(cls, datapack_path: Path, datapack_id: str) -> None:
     if not (datapack_path.parent/"OhMyDat").exists():
       print("installing OhMyDat")
       cp = subprocess.run(['git', 'clone', 'https://github.com/Ai-Akaishi/OhMyDat.git'],cwd=datapack_path.parent, encoding='utf-8', stderr=subprocess.PIPE)
@@ -2436,7 +2487,7 @@ class OhMyDat(IDatapackLibrary):
 
   _storage = StorageNbt('oh_my_dat:')
   _data = _storage['_',List[List[List[List[List[List[List[List[Compound]]]]]]]]][-4][-4][-4][-4][-4][-4][-4][-4]
-  _scoreboard = Scoreboard(Objective('OhMyDatID'),EntitySelector.Player('_'))
+  _scoreboard = Scoreboard(Objective('OhMyDatID'),Selector.Player('_'))
 
   @property
   @classmethod
@@ -2472,4 +2523,3 @@ class OhMyDat(IDatapackLibrary):
     """
     cls.using = True
     return Command('function #oh_my_dat:release')
-

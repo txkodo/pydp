@@ -5,7 +5,7 @@ from datapack import Command, FunctionTag, IDatapackLibrary
 
 class ItemFrameHook(IDatapackLibrary):
   @classmethod
-  def install(cls,datapack_path:Path) -> None:
+  def install(cls,datapack_path:Path,datapack_id:str) -> None:
     if not (datapack_path.parent/"ItemFrameHook").exists():
       print("installing ItemFrameHook")
       cp = subprocess.run(['git', 'clone', 'https://github.com/txkodo/ItemFrameHook.git'],cwd=datapack_path.parent, encoding='utf-8', stderr=subprocess.PIPE)
