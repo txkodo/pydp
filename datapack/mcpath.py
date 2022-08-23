@@ -57,6 +57,15 @@ class McPath:
       else:
         return ':'
     return ('#' if self.istag else '') + self._namespace + ':' + '/'.join(self.parts)
+  
+  def str_without_hash(self):
+    if self._namespace == DEFAULT_NAMESPACE:
+      if self.parts:
+        return '/'.join(self.parts)
+      else:
+        return ':'
+    return self._namespace + ':' + '/'.join(self.parts)
+    
 
   def __truediv__(self,path:str):
     if self._parts and self._parts[-1] == '':
@@ -106,4 +115,8 @@ class McPath:
   def predicate(self,root:Path):
     assert not self.istag
     return root/'data'/self._namespace/'predicates'/('/'.join(self._parts)+'.json')
+
+  def recipe(self,root:Path):
+    assert not self.istag
+    return root/'data'/self._namespace/'recipes'/('/'.join(self._parts)+'.json')
 
