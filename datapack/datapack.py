@@ -1664,6 +1664,17 @@ class ExternalFunction(IFunction):
   def __init__(self,path:str|McPath) -> None:
     super().__init__()
     self._path = McPath(path)
+    if self._path.istag: raise ValueError("ExternalFunctionTag path must not starts with '#'")
+
+  @property
+  def path(self) -> McPath:
+    return self._path
+
+class ExternalFunctionTag(IFunction):
+  def __init__(self,path:str|McPath) -> None:
+    super().__init__()
+    self._path = McPath(path)
+    if not self._path.istag: raise ValueError("ExternalFunctionTag path must starts with '#'")
 
   @property
   def path(self) -> McPath:
@@ -3199,8 +3210,8 @@ class JsonText:
 # 組み込んでおいたほうがエンティティセレクタから呼び出せて便利なので組み込む
 class OhMyDat(IDatapackLibrary):
   using = False
-  PleaseMyDat = ExternalFunction('#oh_my_dat:please')
-  PleaseItsDat = ExternalFunction('#oh_its_dat:please')
+  PleaseMyDat = ExternalFunctionTag('#oh_my_dat:please')
+  PleaseItsDat = ExternalFunctionTag('#oh_its_dat:please')
 
   @classmethod
   def install(cls, datapack_path: Path, datapack_id: str) -> None:
@@ -3323,6 +3334,33 @@ class OhMyDat(IDatapackLibrary):
 
 class IPredicate:
   predicates:list[IPredicate] = []
+  def __init__(self,path:str|McPath|None=None) -> None:
+    IPredicate.predicates.append(self)
+    self._path = McPath(path)
+
+  def export(self,datapack_path:Path):
+    path = self.path.predicate(datapack_path)
+    Datapack.mkdir(path)
+    path.write_text(
+      json.dumps(self.export_dict()),
+      encoding='utf8'
+    )
+
+  @property
+  def path(self):
+    if self._path is None:
+      self._path = Datapack.default_path/gen_id(upper=False,length=24)
+    else:
+      self._path
+    return self._path
+
+  @abstractmethod  
+  def export_dict(self) -> dict[str,Any]:
+    pass
+
+
+class IRecipe:
+  recipes:list[IRecipe] = []
   def __init__(self,path:str|McPath|None=None) -> None:
     IPredicate.predicates.append(self)
     self._path = McPath(path)
