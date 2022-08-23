@@ -1989,7 +1989,7 @@ class Function:
 
     self.visited = True
 
-  def export_commands(self,path:Path,commands:list[str],subcommand:list[ISubCommandSegment]):
+  def export_commands(self,path:Path,commands:list[str],subcommand:list[ISubCommandSegment],is_root:bool=False):
     match self.callstate:
       case _FuncState.NEEDLESS:
         pass
@@ -2011,13 +2011,14 @@ class Function:
           commands.append(cmd.export())
           cmd.subcommands = s
       case _FuncState.EXPORT:
-        cmds:list[str] = []
-        for cmd in self.commands:
-          if isinstance(cmd,Command.Function.Function):
-            cmd.holder.export_commands(path,cmds,cmd.subcommands)
-          else:
-            cmds.append(cmd.export())
-        self.export_function(path,cmds)
+        if is_root:
+          cmds:list[str] = []
+          for cmd in self.commands:
+            if isinstance(cmd,Command.Function.Function):
+              cmd.holder.export_commands(path,cmds,cmd.subcommands)
+            else:
+              cmds.append(cmd.export())
+          self.export_function(path,cmds)
         c = Command.Function(self.path)
         c.subcommands = [*subcommand]
         commands.append(c.export())
@@ -2056,7 +2057,7 @@ class Function:
 
   def export(self,path:Path) -> None:
     if self.callstate is _FuncState.EXPORT:
-      self.export_commands(path,[],[])
+      self.export_commands(path,[],[],True)
 
 
 

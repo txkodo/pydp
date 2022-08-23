@@ -1,0 +1,4 @@
+datapack
+datapack/installer
+datapack/item_frame_hook
+datapack/on_summon
