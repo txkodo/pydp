@@ -33,7 +33,5 @@ FunctionTag.tick.append(_tick)
 
 _tick += Selector.E(predicate={_pred:False}).As().At(Selector.S()) + OnSummon.call()
 
-
-
 OnInstall.install_func += _obj.Add()
 OnInstall.uninstall_func += _obj.Remove()

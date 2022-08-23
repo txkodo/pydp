@@ -25,13 +25,18 @@ def setBuildId(id:str):
   global build_id
   build_id = id
 
-class OnInstall(IDatapackLibrary):
-  _uninstall_all_func = Function()
-  install_func = Function(commands=[_uninstall_all_func.Call()])
-  uninstall_func = Function()
+_uninstall_all_func = Function()
+OnInstall = Function(commands=[_uninstall_all_func.Call()])
+OnUninstall = Function()
+
+class OnInstallCls(IDatapackLibrary):
 
   @classmethod
   def install(cls, datapack_path: Path, datapack_id: str) -> None:
+    global OnInstall
+    global OnUninstall
+    global _uninstall_all_func
+
     build_nbt = StorageNbt(f'{datapack_id}:install')['build_id', Str]
 
     install_mcpath = McPath(f'{datapack_id}:install')
@@ -39,18 +44,16 @@ class OnInstall(IDatapackLibrary):
     uninstall_funcs_mcpath = McPath(f'{datapack_id}:core/uninstall')
 
     # installの解決
-    cls.install_func.set_path(install_mcpath)
+    OnInstall.set_path(install_mcpath)
     load = Function()
-    load += build_nbt.notMatch(Str(build_id)) + cls.install_func.Call()
-    cls.install_func += build_nbt.set(Str(build_id))
-    cls.install_func += Command.Tellraw(Selector.A(),f"[{datapack_id}] installed build_id={build_id}")
+    load += build_nbt.notMatch(Str(build_id)) + OnInstall.Call()
+    OnInstall += build_nbt.set(Str(build_id))
+    OnInstall += Command.Tellraw(Selector.A(),f"[{datapack_id}] installed build_id={build_id}")
     FunctionTag.load.append(load)
 
-    cls._uninstall_all_func
-
-    cls.uninstall_func += Command.Tellraw(Selector.A(),f"[{datapack_id}] uninstalled build_id={build_id}")
-    cls.uninstall_func.set_path(uninstall_funcs_mcpath/build_id)
-    cls.uninstall_func.delete_on_regenerate = False
+    OnUninstall += Command.Tellraw(Selector.A(),f"[{datapack_id}] uninstalled build_id={build_id}")
+    OnUninstall.set_path(uninstall_funcs_mcpath/build_id)
+    OnUninstall.delete_on_regenerate = False
 
     # uninstall_all
     uninstalls_path = uninstall_funcs_mcpath.function_dir(datapack_path)
@@ -59,11 +62,11 @@ class OnInstall(IDatapackLibrary):
         if func.suffix == '.mcfunction':
           if func.stem == build_id:
             raise ValueError(f'build_id {build_id} is not unique id')
-          cls._uninstall_all_func += build_nbt.isMatch(Str(func.stem)) + Command.Function(uninstall_funcs_mcpath/func.stem)
+          _uninstall_all_func += build_nbt.isMatch(Str(func.stem)) + Command.Function(uninstall_funcs_mcpath/func.stem)
 
     # uninstallの解決
-    uninstall_func = Function(uninstall_mcpath)
+    OnUninstall = Function(uninstall_mcpath)
 
-    uninstall_func += build_nbt.isMatch(Str(build_id)) + cls.uninstall_func.Call()
+    OnUninstall += build_nbt.isMatch(Str(build_id)) + OnUninstall.Call()
 
-    cls.uninstall_func += build_nbt.remove()
+    OnUninstall += build_nbt.remove()
