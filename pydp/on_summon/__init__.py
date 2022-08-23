@@ -1,2 +1,2 @@
 
-from .on_summon import OnSummon
+from pydp.on_summon import OnSummon

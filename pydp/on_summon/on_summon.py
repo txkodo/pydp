@@ -2,8 +2,9 @@
 新しく生成されたエンティティに対して発動するファンクションタグ #minecraft:summon を追加する
 summonコマンド呼び出し直後(コマンドによって生成されたエンティティ)と、毎チックのはじめ(自然スポーンしたエンティティ)に対し実行する
 """
-from library.on_install import OnInstall
+from pydp.on_install import OnInstall
 from pydp.datapack import Command, ICommand, Function, FunctionTag, Objective
+from pydp.on_install.on_install import OnUninstall
 from pydp.predicate import EntityScores
 from pydp.selector import Selector
 
@@ -33,5 +34,5 @@ FunctionTag.tick.append(_tick)
 
 _tick += Selector.E(predicate={_pred:False}).As().At(Selector.S()) + OnSummon.call()
 
-OnInstall.install_func += _obj.Add()
-OnInstall.uninstall_func += _obj.Remove()
+OnInstall += _obj.Add()
+OnUninstall += _obj.Remove()

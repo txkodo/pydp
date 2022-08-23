@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 setup(
     name="pydp",
@@ -7,5 +7,5 @@ setup(
     description="construct and generate minecraft datapack.",
     author="txkodo",
     url="https://github.com/txkodo/pydp",
-    packages=find_packages('pydp'),
+    packages=['pydp','pydp/on_install','pydp/on_summon','pydp/item_frame_hook'],
 )

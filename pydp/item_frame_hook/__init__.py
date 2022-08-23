@@ -1,2 +1,2 @@
 
-from .item_frame_hook import ItemFrameHook
+from pydp.item_frame_hook import ItemFrameHook
