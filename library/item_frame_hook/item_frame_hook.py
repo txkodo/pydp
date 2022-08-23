@@ -2,8 +2,8 @@ from pathlib import Path
 import shutil
 import subprocess
 from typing import Literal
-from .datapack import Command, FunctionTag, IDatapackLibrary
-from .selector import Selector
+from pydp.datapack import Command, FunctionTag, IDatapackLibrary
+from pydp.selector import Selector
 
 class ItemFrameHook(IDatapackLibrary):
   @classmethod
