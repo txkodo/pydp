@@ -1,4 +1,4 @@
-from src.datapack import Item
+from .datapack import Item
 
 class ItemList:
     acacia_boat = Item('acacia_boat')

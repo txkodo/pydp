@@ -13,8 +13,8 @@ import shutil
 import subprocess
 from uuid import UUID, uuid4
 
-from src.mcpath import McPath
-from src.util import float_to_str, gen_id
+from .mcpath import McPath
+from .util import float_to_str, gen_id
 
 
 

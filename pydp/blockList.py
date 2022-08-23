@@ -1,4 +1,4 @@
-from src.datapack import Block
+from .datapack import Block
 
 class BlockList:
     acacia_button = Block('acacia_button')

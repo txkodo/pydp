@@ -1,8 +1,8 @@
 from pathlib import Path
 from random import randint
-from src.datapack import Command, Function, FunctionTag, IDatapackLibrary, StorageNbt, Str
-from src.mcpath import McPath
-from src.selector import Selector
+from .datapack import Command, Function, FunctionTag, IDatapackLibrary, StorageNbt, Str
+from .mcpath import McPath
+from .selector import Selector
 
 _id_upper = tuple(map(chr, range(ord('A'), ord('Z')+1)))
 _id_lower = tuple(map(chr, range(ord('a'), ord('z')+1)))

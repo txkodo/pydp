@@ -1,6 +1,6 @@
 __version__ = "0.1.0"
 
-from src.datapack import (
+from .datapack import (
   McUUID,
   Position,
   ICommand,
@@ -45,8 +45,8 @@ from src.datapack import (
   IPredicate
 )
 
-from src.blockList import BlockList
-from src.itemList import ItemList
-from src.mcpath import McPath
-from src.predicate import EntityScores,ExistPredicate
-from src.selector import Selector,EntitySelector,PlayerSelector,SelfSelector,NameSelector,UUIDSelector
+from .blockList import BlockList
+from .itemList import ItemList
+from .mcpath import McPath
+from .predicate import EntityScores,ExistPredicate
+from .selector import Selector,EntitySelector,PlayerSelector,SelfSelector,NameSelector,UUIDSelector

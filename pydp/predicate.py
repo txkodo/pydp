@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Literal
-from src.datapack import IPredicate, Objective
-from src.mcpath import McPath
+from .datapack import IPredicate, Objective
+from .mcpath import McPath
 
 
 class ExistPredicate(IPredicate):

@@ -3,9 +3,9 @@
 summonコマンド呼び出し直後(コマンドによって生成されたエンティティ)と、毎チックのはじめ(自然スポーンしたエンティティ)に対し実行する
 """
 from library.on_install import OnInstall
-from src.datapack import Command, ICommand, Function, FunctionTag, Objective
-from src.predicate import EntityScores
-from src.selector import Selector
+from .datapack import Command, ICommand, Function, FunctionTag, Objective
+from .predicate import EntityScores
+from .selector import Selector
 
 _obj = Objective('OnSummon')
 

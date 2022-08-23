@@ -2,9 +2,9 @@ from __future__ import annotations
 from abc import ABCMeta
 import re
 from typing import Literal, TypeVar
-from src.datapack import Compound, IPredicate, ISelector, McUUID, Objective, Position, Value
-from src.mcpath import McPath
-from src.util import float_to_str
+from .datapack import Compound, IPredicate, ISelector, McUUID, Objective, Position, Value
+from .mcpath import McPath
+from .util import float_to_str
 
 class Selector(ISelector,metaclass=ABCMeta):
   _max_limit = 2147483647
