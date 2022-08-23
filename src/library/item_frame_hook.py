@@ -1,7 +1,9 @@
 from pathlib import Path
 import shutil
 import subprocess
-from datapack import Command, FunctionTag, IDatapackLibrary
+from typing import Literal
+from src.datapack import Command, FunctionTag, IDatapackLibrary
+from src.selector import Selector
 
 class ItemFrameHook(IDatapackLibrary):
   @classmethod
@@ -25,10 +27,22 @@ class ItemFrameHook(IDatapackLibrary):
     if o:name.append('out')
     if r:name.append('rot')
     if name:
-      return Command.CallFunc('ifh:api/'+'_'.join(name))
+      return Command.Function('ifh:api/'+'_'.join(name))
     else:
-      return Command.CallFunc('ifh:api/none')
+      return Command.Function('ifh:api/none')
 
-  OnOut = FunctionTag('ifh','on_out')
-  OnIn  = FunctionTag('ifh','on_in')
-  OnRot  = FunctionTag('ifh','on_rot')
+  @classmethod
+  def CounterClockWise(cls):
+    return Command.Function('ifh:api/counterclockwise')
+
+  @classmethod
+  def RotationSelectorS(cls,rotation:Literal[0,1,2,3,4,5,6,7]):
+    return Selector.S(tag=f'ifh.{rotation}')
+
+  @classmethod
+  def RotationSelectorE(cls,rotation:Literal[0,1,2,3,4,5,6,7]):
+    return Selector.E(tag=f'ifh.{rotation}')
+
+  OnOut = FunctionTag('#ifh:on_out')
+  OnIn  = FunctionTag('#ifh:on_in')
+  OnRot  = FunctionTag('#ifh:on_rot')
