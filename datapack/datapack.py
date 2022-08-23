@@ -762,7 +762,7 @@ class Command:
       return 'reload'
 
   class Function(ICommand):
-    def __init__(self,function:IFunction|FunctionTag) -> None:
+    def __init__(self,function:IFunction) -> None:
       super().__init__()
       self.function = function
 
@@ -771,32 +771,22 @@ class Command:
 
   class Schedule:
     class Function(ICommand):
-      def __init__(self,function:IFunction|FunctionTag,tick:int,append:bool=False) -> None:
+      def __init__(self,function:IFunction,tick:int,append:bool=False) -> None:
         super().__init__()
         self.function = function
         self.tick = tick
         self.append = append
 
       def export_command(self) -> str:
-        match self.function:
-          case IFunction():
-            path = self.function.path
-          case FunctionTag():
-            path = self.function.path
-        return f'schedule function {path}' + (' append' if self.append else '')
+        return f'schedule function {self.function.path}' + (' append' if self.append else '')
 
     class Clear(ICommand):
-      def __init__(self,function:IFunction|FunctionTag) -> None:
+      def __init__(self,function:IFunction) -> None:
         super().__init__()
         self.function = function
 
       def export_command(self) -> str:
-        match self.function:
-          case IFunction():
-            path = self.function.path
-          case FunctionTag():
-            path = self.function.path
-        return 'schedule clear ' + str(path)
+        return 'schedule clear ' + str(self.function.path)
 
   class Say(ICommand):
     def __init__(self,content:str) -> None:
@@ -1411,62 +1401,6 @@ class Command:
         def export_command(self) -> str:
           return f'scoreboard players operation {self.target.expression()} {self.operator} {self.source.expression()}'
 
-class FunctionTag:
-  tick:FunctionTag
-  load:FunctionTag
-  functiontags:list[FunctionTag] = []
-  def __init__(self,path:str|McPath,export_if_empty:bool=True) -> None:
-    FunctionTag.functiontags.append(self)
-    self.path = McPath(path)
-    assert self.path.istag
-    self.export_if_empty = export_if_empty
-    self.functions:list[Function|str|McPath] = []
-
-  @property
-  def expression(self) -> str:
-    return self.path.str
-
-  def call(self) -> ICommand:
-    return Command.Function(self)
-
-  @property
-  def expression_without_hash(self) -> str:
-    return self.path.str
-
-  def append(self,function:Function|str|McPath):
-    if isinstance(function,Function):
-      function.tagged = True
-    self.functions.append(function)
-
-  def check_call_relation(self):
-    """呼び出し先のファンクションにタグから呼ばれることを伝える"""
-    for f in self.functions:
-      if isinstance(f,Function):
-        f.tagged = True
-        f.within.add(self)
-
-  def export(self,path:Path) -> None:
-    path = self.path.function_tag(path)
-    values:list[str] = []
-    for f in self.functions:
-      if isinstance(f,Function) and f.callstate is _FuncState.EXPORT:
-        """中身のある呼び出し先だけ呼び出す"""
-        values.append(f.expression)
-
-    paths:list[Path] = []
-    if self.export_if_empty or values:
-      _path = path
-      while not _path.exists():
-        paths.append(_path)
-        _path = _path.parent
-      Datapack.created_paths.extend(reversed(paths))
-
-      path.parent.mkdir(parents=True,exist_ok=True)
-      path.write_text(json.dumps({"values":values}),encoding='utf8')
-
-FunctionTag.tick = FunctionTag('#minecraft:tick',False)
-FunctionTag.load = FunctionTag('#minecraft:load',False)
-
 class IDatapackLibrary:
   """
   データパックライブラリ用クラス
@@ -1831,7 +1765,7 @@ class Function(IFunction):
 
 
     self.delete_on_regenerate = delete_on_regenerate
-    
+
     self.functions.append(self)
     self.commands:list[ICommand] = [*commands] if commands else []
     self._path = None if path is None else McPath(path)
@@ -1849,7 +1783,7 @@ class Function(IFunction):
     self.calls:set[Function] = set()
 
     self.within:set[Function|FunctionTag] = set()
-  
+
     if access_modifier is None:
       if self._hasname:
         access_modifier = Function.default_access_modifier
@@ -1963,9 +1897,8 @@ class Function(IFunction):
             func = cmd.function
             if isinstance(func,Function):
               func.export_commands(path,commands,cmd.subcommands)
-              passed = True
-          if not passed:
-            commands.append(cmd.export())
+              continue
+          commands.append(cmd.export())
       case _FuncState.SINGLE:
         assert len(self.commands) == 1
         cmd = self.commands[0]
@@ -1987,14 +1920,13 @@ class Function(IFunction):
               func = cmd.function
               if isinstance(func,Function):
                 func.export_commands(path,cmds,cmd.subcommands)
-                passed = True
-            if not passed:
-              cmds.append(cmd.export())
+                continue
+            cmds.append(cmd.export())
           self.export_function(path,cmds)
 
         cmd = Command.Function(self)
         cmd.subcommands = [*subcommand]
-        commands.append(cmd.export_command())
+        commands.append(cmd.export())
 
   def export_function(self,path:Path,commands:list[str]):
     path = self.path.function(path)
@@ -2032,6 +1964,61 @@ class Function(IFunction):
     if self.callstate is _FuncState.EXPORT:
       self.export_commands(path,[],[],True)
 
+class FunctionTag(IFunction):
+  tick:FunctionTag
+  load:FunctionTag
+  functiontags:list[FunctionTag] = []
+  def __init__(self,path:str|McPath,export_if_empty:bool=True) -> None:
+    FunctionTag.functiontags.append(self)
+    self._path = McPath(path)
+    assert self._path.istag
+    self.export_if_empty = export_if_empty
+    self.functions:list[Function|str|McPath] = []
+
+  @property
+  def path(self) -> McPath:
+    return self._path
+
+  def call(self) -> ICommand:
+    return Command.Function(self)
+
+  @property
+  def expression_without_hash(self) -> str:
+    return self._path.str
+
+  def append(self,function:Function|str|McPath):
+    if isinstance(function,Function):
+      function.tagged = True
+    self.functions.append(function)
+
+  def check_call_relation(self):
+    """呼び出し先のファンクションにタグから呼ばれることを伝える"""
+    for f in self.functions:
+      if isinstance(f,Function):
+        f.tagged = True
+        f.within.add(self)
+
+  def export(self,path:Path) -> None:
+    path = self.path.function_tag(path)
+    values:list[str] = []
+    for f in self.functions:
+      if isinstance(f,Function) and f.callstate is _FuncState.EXPORT:
+        """中身のある呼び出し先だけ呼び出す"""
+        values.append(f.expression)
+
+    paths:list[Path] = []
+    if self.export_if_empty or values:
+      _path = path
+      while not _path.exists():
+        paths.append(_path)
+        _path = _path.parent
+      Datapack.created_paths.extend(reversed(paths))
+
+      path.parent.mkdir(parents=True,exist_ok=True)
+      path.write_text(json.dumps({"values":values}),encoding='utf8')
+
+FunctionTag.tick = FunctionTag('#minecraft:tick',False)
+FunctionTag.load = FunctionTag('#minecraft:load',False)
 
 
 
