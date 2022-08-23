@@ -1,6 +1,6 @@
 from pathlib import Path
 from random import randint
-from datapack.datapack import Command, Function, FunctionTag, IDatapackLibrary, StorageNbt, Str
+from datapack.datapack import Command, ExternalFunction, Function, FunctionTag, IDatapackLibrary, StorageNbt, Str
 from datapack.mcpath import McPath
 from datapack.selector import Selector
 
@@ -58,7 +58,7 @@ class Installer(IDatapackLibrary):
         if func.suffix == '.mcfunction':
           if func.stem == build_id:
             raise ValueError(f'build_id {build_id} is not unique id')
-          cls._uninstall_all_func += build_nbt.isMatch(Str(func.stem)) + Command.Function(uninstall_funcs_mcpath/func.stem)
+          cls._uninstall_all_func += build_nbt.isMatch(Str(func.stem)) + ExternalFunction(uninstall_funcs_mcpath/func.stem).Call()
 
     # uninstallの解決
     cls.OnUninstall = Function(uninstall_mcpath)

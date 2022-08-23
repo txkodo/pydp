@@ -570,10 +570,6 @@ class SubCommand:
       result = SubCommand()
       result.subcommands = self.subcommands + other.subcommands
       return result
-    elif isinstance(other,Command.Function.Function):
-      result = Command.Function.Function(other.holder)
-      result.subcommands = self.subcommands + other.subcommands
-      return result
     else:
       result = copy(other)
       result.subcommands = self.subcommands + other.subcommands
@@ -766,100 +762,41 @@ class Command:
       return 'reload'
 
   class Function(ICommand):
-    def __new__(cls,function:McPath|str|Function|FunctionTag) -> ICommand:
-      match function:
-        case Function():
-          return Command.Function.Function(function)
-        case FunctionTag():
-          return Command.Function.FunctionTag(function)
-        case _:
-          return Command.Function.FunctionExist(function)
+    def __init__(self,function:IFunction|FunctionTag) -> None:
+      super().__init__()
+      self.function = function
 
-    def __init__(self,*_:Any,**__:Any) -> None: raise NotImplementedError
-
-    class FunctionExist(ICommand):
-      def __init__(self,function:McPath|str) -> None:
-        super().__init__()
-        self.path = function
-
-      def export_command(self) -> str:
-        return f'function {McPath(self.path).str}'
-
-    class Function(ICommand):
-      def __init__(self,function:Function) -> None:
-        super().__init__()
-        self.holder = function
-
-      def export_command(self) -> str:
-        raise NotImplementedError
-
-    class FunctionTag(ICommand):
-      def __init__(self,function:FunctionTag) -> None:
-        super().__init__()
-        self.holder = function
-      
-      def export_command(self) -> str:
-        return f'function {self.holder.path}'
-
+    def export_command(self) -> str:
+      return f'function {self.function.path}'
 
   class Schedule:
     class Function(ICommand):
-      def __new__(cls,function:McPath|str|Function|FunctionTag,tick:int,append:bool=False) -> ICommand:
-        match function:
-          case Function():
-            return Command.Schedule.Function.Function(function,tick,append)
+      def __init__(self,function:IFunction|FunctionTag,tick:int,append:bool=False) -> None:
+        super().__init__()
+        self.function = function
+        self.tick = tick
+        self.append = append
+
+      def export_command(self) -> str:
+        match self.function:
+          case IFunction():
+            path = self.function.path
           case FunctionTag():
-            return Command.Schedule.Function.FunctionTag(function,tick,append)
-          case _:
-            return Command.Schedule.Function.FunctionExist(function,tick,append)
-
-      def __init__(self,*_:Any,**__:Any) -> None: raise NotImplementedError
-    
-      class Function(ICommand):
-        def __init__(self,function:Function,tick:int,append:bool=False) -> None:
-          super().__init__()
-          self.holder = function
-          self.tick = tick
-          self.append = append
-        
-        def export_command(self) -> str:
-          return f'schedule function {self.holder.expression}' + (' append' if self.append else '')
-
-      class FunctionTag(ICommand):
-        def __init__(self,function:FunctionTag,tick:int,append:bool=False) -> None:
-          super().__init__()
-          self.holder = function
-          self.tick = tick
-          self.append = append
-        
-        def export_command(self) -> str:
-          return f'schedule function {self.holder.expression}' + (' append' if self.append else '')
-
-      class FunctionExist(ICommand):
-        def __init__(self,function:McPath|str,tick:int,append:bool=False) -> None:
-          super().__init__()
-          self.path = function
-          self.tick = tick
-          self.append = append
-
-        def export_command(self) -> str:
-          return f'schedule function {McPath(self.path).str}' + (' append' if self.append else '')
-
+            path = self.function.path
+        return f'schedule function {path}' + (' append' if self.append else '')
 
     class Clear(ICommand):
-      def __init__(self,function:McPath|str|Function|FunctionTag) -> None:
+      def __init__(self,function:IFunction|FunctionTag) -> None:
         super().__init__()
         self.function = function
 
       def export_command(self) -> str:
         match self.function:
-          case Function():
-            path = self.function.expression
+          case IFunction():
+            path = self.function.path
           case FunctionTag():
-            path = self.function.expression
-          case _:
-            path = McPath(self.function).str
-        return 'schedule clear ' + path
+            path = self.function.path
+        return 'schedule clear ' + str(path)
 
   class Say(ICommand):
     def __init__(self,content:str) -> None:
@@ -1769,14 +1706,42 @@ class Datapack(metaclass=_DatapackMeta):
       path.parent.mkdir(parents=True,exist_ok=True)
 
 
+
+class IFunction(metaclass=ABCMeta):
+  def __init__(self) -> None:
+    pass
+
+  def Call(self) -> ICommand:
+    return Command.Function(self)
+
+  def Schedule(self,tick:int,append:bool=False) -> ICommand:
+    self._scheduled = True
+    return Command.Schedule.Function(self,tick,append)
+
+  def ScheduleClear(self) -> ICommand:
+    self._scheduled = True
+    return Command.Schedule.Clear(self)
+
+  @property
+  @abstractmethod
+  def path(self) -> McPath: pass
+
+class ExternalFunction(IFunction):
+  def __init__(self,path:str|McPath) -> None:
+    super().__init__()
+    self._path = McPath(path)
+
+  @property
+  def path(self) -> McPath:
+    return self._path
+
 class _FuncState(Enum):
   NEEDLESS = auto()
   FLATTEN = auto()
   SINGLE = auto()
   EXPORT = auto()
 
-
-class Function:
+class Function(IFunction):
   """
   新規作成するmcfunctionをあらわすクラス
 
@@ -1907,8 +1872,10 @@ class Function:
     return self
 
   def append(self,command:ICommand):
-    if isinstance(command,Command.Function.Function):
-      self._children.add(command.holder)
+    if isinstance(command,Command.Function):
+      func = command.function
+      if isinstance(func,Function):
+        self._children.add(func)
     self.commands.append(command)
 
   def extend(self,commands:Iterable[ICommand]):
@@ -1919,21 +1886,13 @@ class Function:
   def expression(self) -> str:
     return self.path.str
 
-  def Call(self) -> ICommand:
-    return Command.Function(self)
-
-  def schedule(self,tick:int,append:bool=False) -> ICommand:
-    self._scheduled = True
-    return Command.Schedule.Function(self,tick,append)
-
-  def clear_schedule(self) -> ICommand:
-    self._scheduled = True
-    return Command.Schedule.Clear(self)
-
   def _isempty(self):
     for cmd in self.commands:
-      if not (isinstance(cmd,Command.Function.Function) and cmd.holder._isempty()):
-        return False
+      if isinstance(cmd,Command.Function):
+        func = cmd.function
+        if isinstance(func,Function) and func._isempty():
+          continue
+      return False
     return True
 
   def _issingle(self):
@@ -1952,12 +1911,14 @@ class Function:
   def check_call_relation(self):
     """呼び出し先一覧を整理"""
     for cmd in self.commands:
-      if isinstance(cmd,Command.Function.Function):
-        if cmd.subcommands:
-          cmd.holder.subcommanded = True
-        cmd.holder.used = True
-        self.calls.add(cmd.holder)
-        cmd.holder.within.add(self)
+      if isinstance(cmd,Command.Function):
+        func = cmd.function
+        if isinstance(func,Function):
+          if cmd.subcommands:
+            func.subcommanded = True
+          func.used = True
+          self.calls.add(func)
+          func.within.add(self)
 
   def define_state(self) -> None:
     """関数を埋め込むか書き出すか決定する"""
@@ -1980,32 +1941,40 @@ class Function:
     parents = parents|{self}
 
     for cmd in self.commands:
-      if isinstance(cmd,Command.Function.Function):
-        func = cmd.holder
-        if func in parents:
-          func.callstate = _FuncState.EXPORT
-        if func.callstate is _FuncState.FLATTEN or func.callstate is _FuncState.SINGLE:
-          func.recursivecheck(parents)
+      if isinstance(cmd,Command.Function):
+        func = cmd.function
+        if isinstance(func,Function):
+          if func in parents:
+            func.callstate = _FuncState.EXPORT
+          if func.callstate is _FuncState.FLATTEN or func.callstate is _FuncState.SINGLE:
+            func.recursivecheck(parents)
 
     self.visited = True
 
   def export_commands(self,path:Path,commands:list[str],subcommand:list[ISubCommandSegment],is_root:bool=False):
+    passed = False
     match self.callstate:
       case _FuncState.NEEDLESS:
         pass
       case _FuncState.FLATTEN:
         assert not subcommand
         for cmd in self.commands:
-          if isinstance(cmd,Command.Function.Function):
-            cmd.holder.export_commands(path,commands,cmd.subcommands)
-          else:
+          if isinstance(cmd,Command.Function):
+            func = cmd.function
+            if isinstance(func,Function):
+              func.export_commands(path,commands,cmd.subcommands)
+              passed = True
+          if not passed:
             commands.append(cmd.export())
       case _FuncState.SINGLE:
         assert len(self.commands) == 1
         cmd = self.commands[0]
-        if isinstance(cmd,Command.Function.Function):
-          cmd.holder.export_commands(path,commands,subcommand + cmd.subcommands)
-        else:
+        if isinstance(cmd,Command.Function):
+          func = cmd.function
+          if isinstance(func,Function):
+            func.export_commands(path,commands,subcommand + cmd.subcommands)
+            passed = True
+        if not passed:
           s = cmd.subcommands
           cmd.subcommands = subcommand + cmd.subcommands
           commands.append(cmd.export())
@@ -2014,14 +1983,18 @@ class Function:
         if is_root:
           cmds:list[str] = []
           for cmd in self.commands:
-            if isinstance(cmd,Command.Function.Function):
-              cmd.holder.export_commands(path,cmds,cmd.subcommands)
-            else:
+            if isinstance(cmd,Command.Function):
+              func = cmd.function
+              if isinstance(func,Function):
+                func.export_commands(path,cmds,cmd.subcommands)
+                passed = True
+            if not passed:
               cmds.append(cmd.export())
           self.export_function(path,cmds)
-        c = Command.Function(self.path)
-        c.subcommands = [*subcommand]
-        commands.append(c.export())
+
+        cmd = Command.Function(self)
+        cmd.subcommands = [*subcommand]
+        commands.append(cmd.export_command())
 
   def export_function(self,path:Path,commands:list[str]):
     path = self.path.function(path)
@@ -3239,6 +3212,8 @@ class JsonText:
 # 組み込んでおいたほうがエンティティセレクタから呼び出せて便利なので組み込む
 class OhMyDat(IDatapackLibrary):
   using = False
+  PleaseMyDat = ExternalFunction('#oh_my_dat:please')
+  PleaseItsDat = ExternalFunction('#oh_its_dat:please')
 
   @classmethod
   def install(cls, datapack_path: Path, datapack_id: str) -> None:
@@ -3274,18 +3249,18 @@ class OhMyDat(IDatapackLibrary):
     cls.using = True
     match holder:
       case None:
-        return Command.Function('#oh_its_dat:please')
+        return Command.Function(cls.PleaseMyDat)
       case ISelector():
-        return holder.As() + Command.Function('#oh_its_dat:please')
+        return holder.As() + Command.Function(cls.PleaseMyDat)
       case Scoreboard():
         f = Function()
         f += cls._scoreboard.Oparation('=',holder)
-        f += Command.Function('#oh_its_dat:please')
+        f += Command.Function(cls.PleaseItsDat)
         return f.Call()
       case ICommand():
         f = Function()
         f += cls._scoreboard.StoreResult() + holder
-        f += Command.Function('#oh_its_dat:please')
+        f += Command.Function(cls.PleaseItsDat)
         return f.Call()
 
   _storage = StorageNbt('oh_my_dat:')

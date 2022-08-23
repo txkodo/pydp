@@ -2,9 +2,8 @@
 新しく生成されたエンティティに対して発動するファンクションタグ #minecraft:summon を追加する
 summonコマンド呼び出し直後(コマンドによって生成されたエンティティ)と、毎チックのはじめ(自然スポーンしたエンティティ)に対し実行する
 """
-from datapack.installer import OnInstall
+from datapack.installer import Installer
 from datapack.datapack import Command, ICommand, Function, FunctionTag, Objective
-from datapack.installer.installer import OnUninstall
 from datapack.predicate import EntityScores
 from datapack.selector import Selector
 
@@ -34,5 +33,5 @@ FunctionTag.tick.append(_tick)
 
 _tick += Selector.E(predicate={_pred:False}).As().At(Selector.S()) + OnSummon.call()
 
-OnInstall += _obj.Add()
-OnUninstall += _obj.Remove()
+Installer.OnInstall += _obj.Add()
+Installer.OnUninstall += _obj.Remove()
