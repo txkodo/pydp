@@ -13,8 +13,8 @@ import shutil
 import subprocess
 from uuid import UUID, uuid4
 
-from .mcpath import McPath
-from .util import float_to_str, gen_id
+from datapack.mcpath import McPath
+from datapack.util import float_to_str, gen_id
 
 
 
@@ -3358,7 +3358,6 @@ class IPredicate:
   def export_dict(self) -> dict[str,Any]:
     pass
 
-
 class IRecipe:
   _type:str
   recipes:list[IRecipe] = []
@@ -3391,56 +3390,3 @@ class IRecipe:
   @abstractmethod
   def export_dict(self) -> dict[str,Any]:
     pass
-
-class RecipeShaped(IRecipe):
-  def __init__(self,pattern:list[str],items:dict[str,Item|list[Item]],result:Item,count:int|None=None,group:str|None=None,path:str|McPath|None=None) -> None:
-    self._pattern = pattern
-    self._keys = items
-    self._count = count
-    self._result = result
-    super().__init__(path,group)
-
-  def export(self,datapack_path:Path):
-    path = self.path.recipe(datapack_path)
-    Datapack.mkdir(path)
-    path.write_text(
-      json.dumps(self.export_dict()),
-      encoding='utf8'
-    )
-
-  @property
-  def path(self):
-    if self._path is None:
-      self._path = Datapack.default_path/gen_id(upper=False,length=24)
-    else:
-      self._path
-    return self._path
-
-  @abstractmethod
-  def export_dict(self) -> dict[str,Any]:
-    def convert(item:Item|list[Item]) -> dict[str, str]|list[dict[str, str]]:
-      match item:
-        case Item():
-          if item.id.istag:
-            return {'tag':item.id.str_without_hash()}
-          else:
-            return {'item':item.id.str_without_hash()}
-        case list():
-          result:list[dict[str, str]] = []
-          for i in item:
-            if i.id.istag:
-              result.append({'tag':i.id.str_without_hash()})
-            else:
-              result.append({'item':i.id.str_without_hash()})
-          return result
-
-    r:dict[str,str|int] = {'item':self._result.id.str}
-    if self._count is not None: r['count'] = self._count
-
-    result = {
-      'pattern':self._pattern,
-      'key':{ k:convert(v) for k,v in self._keys.items() },
-      'result':r
-    }
-    return result
-

@@ -1,4 +1,5 @@
 pydp.egg-info/
-py_cache/
+__pycache__/
 build/
 datapack.egg-info/
+test.py

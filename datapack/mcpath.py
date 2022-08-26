@@ -8,6 +8,24 @@ class McPathError(Exception):pass
 DEFAULT_NAMESPACE = 'minecraft'
 
 class McPath:
+  """
+  ResourceLocationを表すクラス
+
+  Pathと同様に文字列による除算と.parentにでの親要素アクセスができる
+
+  コンストラクタには以下のような文字列を渡す
+  `minecraft:bar`
+  `foo:bar`
+  `:bar`
+  `bar`
+  `foo:`
+  `:`
+  `#foo:bar`
+  `#foo:`
+  `#:bar`
+  `#bar`
+  `#`
+  """
   __slots__ = ('_namespace', '_parts', '_istag')
   _namespace:str
   _parts:list[str]
@@ -58,7 +76,10 @@ class McPath:
         return ':'
     return ('#' if self.istag else '') + self._namespace + ':' + '/'.join(self.parts)
   
-  def str_without_hash(self):
+  def str_hashless(self):
+    """
+    タグであるかにかかわらず#のついていないResourceLocationを返す
+    """
     if self._namespace == DEFAULT_NAMESPACE:
       if self.parts:
         return '/'.join(self.parts)
